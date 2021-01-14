@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: xcolinlocbld11-hosted-XRT-1
+    runs-on: self-hosted
     container: ubuntu:18.04
     steps:
     - uses: actions/checkout@v2
