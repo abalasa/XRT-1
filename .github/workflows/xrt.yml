@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     runs-on: xcolinlocbld11-hosted-XRT-1
-    container: artifactory.xilinx.com/xrt-build-docker-images-local/xrt-ubuntu1804:latest
+    container: ubuntu:18.04
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
