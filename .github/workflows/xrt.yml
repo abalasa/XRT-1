@@ -16,6 +16,7 @@ jobs:
       run: |
         apt update
         src/runtime_src/tools/scripts/xrtdeps.sh
+
     - name: XRT Build
       run: cd build && chmod +x build.sh ; ./build.sh
     - name: Stash files
