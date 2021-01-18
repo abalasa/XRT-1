@@ -14,9 +14,8 @@ jobs:
     - name: Install dependencies
       if: steps.cache-sha.outputs.cache-hit != 'true'
       run: |
-        apt update
-        src/runtime_src/tools/scripts/xrtdeps.sh
-
+        sudo apt update
+        sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
     - name: XRT Build
       run: cd build && chmod +x build.sh ; ./build.sh
     - name: Stash files
