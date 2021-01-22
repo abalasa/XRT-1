@@ -7,22 +7,6 @@ on:
     branches: [ master ]
 
 jobs:
-  build_ub1604:
-    runs-on: self-hosted-docker-16.04
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install dependencies
-      if: steps.cache-sha.outputs.cache-hit != 'true'
-      run: |
-        sudo apt update
-        sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
-    - name: XRT Build
-      run: cd build && chmod +x build.sh ; ./build.sh
-    - name: Stash files
-      uses: actions/upload-artifact@v2
-      with:
-        name: xrt-deb-ubuntu1604
-        path: build/Release/xrt_*.deb
 
   build_centos74:
     runs-on: self-hosted-docker-centos74
@@ -41,16 +25,6 @@ jobs:
         name: xrt-rpm-centos74
         path: build/Release/xrt_*.rpm
 
-  install_ub1604:
-    runs-on: ubuntu-16.04
-    needs: [build_ub1604]
-    steps:
-      - name: Download XRT debs
-        uses: actions/download-artifact@v2
-        with:
-          name: xrt-deb-ubuntu1604
-      - name: Install xrt debs
-        run: ls -al; sudo apt install -y ./*.deb
   install_centos74:
     runs-on: self-hosted-docker-centos74
     needs: [build_centos74]
