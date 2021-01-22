@@ -3,11 +3,10 @@ name: XRT Build/Install Test CI
 on:
   push:
     branches: [ master ]
-  pull_request:
+  pull_request:	
     branches: [ master ]
 
 jobs:
-
   build_centos74:
     environment: Test
     runs-on: self-hosted-docker-centos74
