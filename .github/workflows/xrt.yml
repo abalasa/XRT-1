@@ -34,4 +34,4 @@ jobs:
         with:
           name: xrt-rpm-centos74
       - name: Install xrt rpms
-        run: ls -al; sudo apt install -y ./*.rpm
+        run: ls -al; sudo yum install -y ./*.rpm
