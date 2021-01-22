@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build_ub16.04:
+  build_ub1604:
     runs-on: self-hosted-docker-16.04
     steps:
     - uses: actions/checkout@v2
@@ -41,9 +41,9 @@ jobs:
         name: xrt-rpm-centos74
         path: build/Release/xrt_*.rpm
 
-  install_ub16.04:
+  install_ub1604:
     runs-on: ubuntu-16.04
-    needs: [build_ub16.04]
+    needs: [build_ub1604]
     steps:
       - name: Download XRT debs
         uses: actions/download-artifact@v2
