@@ -18,7 +18,7 @@ jobs:
         sudo yum -y update
         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
     - name: XRT Build
-      run: cd build && chmod +x build.sh ; ./build.sh
+      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
     - name: Stash files
       uses: actions/upload-artifact@v2
       with:
