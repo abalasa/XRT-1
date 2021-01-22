@@ -9,6 +9,7 @@ on:
 jobs:
 
   build_centos74:
+    environment: Test
     runs-on: self-hosted-docker-centos74
     steps:
     - uses: actions/checkout@v2
