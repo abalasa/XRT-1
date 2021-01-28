@@ -29,6 +29,8 @@ jobs:
     runs-on: self-hosted-docker-centos74
     needs: [build_centos74]
     steps:
+      - name: Uninstall xrt rpms
+        run: sudo yum remove -y xrt xrt-aws
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
         with:
