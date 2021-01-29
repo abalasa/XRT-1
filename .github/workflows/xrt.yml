@@ -38,4 +38,9 @@ jobs:
       - name: Install xrt rpms
         run: ls -al; sudo yum install -y ./*.rpm
       - name: Emulation tests
-        run: cd /tmp/TEST_WORK_HEAD_PCIE_VITIS_DSV_XRT_hw_emu_lin_lin_x86_20210128_035800_XRT_XILINX_U50_GEN3X16_XDMA_201920_3_MISC_lnx64/
+        run: |
+          source /proj/xbuilds/2019.2_released/installs/lin64/Vitis/2019.2/settings64.sh
+          source /opt/xilinx/xrt/setup.sh
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/2019.2_released/installs/lin64/Vitis/2019.2/lib/lnx64.o/Default
+          cd /tmp/PCIE_VITIS_DSV_XRT_hw_emu_lin_lin_x86_20210128_035800_XRT_XILINX_U50_GEN3X16_XDMA_201920_3_MISC_lnx64/
+          export XCL_EMULATION_MODE=hw_emu;  ./host.exe -d acc -k kernel.xclbin
