@@ -8,7 +8,6 @@ on:
 
 jobs:
   build_centos74:
-    environment: Test
     runs-on: self-hosted-docker-centos74
     steps:
     - uses: actions/checkout@v2
@@ -26,7 +25,8 @@ jobs:
         path: build/Release/xrt_*.rpm
 
   install_centos74:
-    runs-on: self-hosted-docker-centos74
+    environment: Test
+    runs-on: self-hosted-centos74
     needs: [build_centos74]
     steps:
       - name: Uninstall xrt rpms
@@ -37,3 +37,5 @@ jobs:
           name: xrt-rpm-centos74
       - name: Install xrt rpms
         run: ls -al; sudo yum install -y ./*.rpm
+      - name: Emulation tests
+        run: cd /tmp/TEST_WORK_HEAD_PCIE_VITIS_DSV_XRT_hw_emu_lin_lin_x86_20210128_035800_XRT_XILINX_U50_GEN3X16_XDMA_201920_3_MISC_lnx64/
