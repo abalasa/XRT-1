@@ -22,7 +22,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: xrt-rpm-centos74
-        path: build/Release/xrt_*.rpm
+        path: build/Release/xrt_*-xrt.rpm
   uninstall_xrt:
     runs-on: self-hosted-centos74
     steps:
