@@ -32,7 +32,7 @@ jobs:
     runs-on: self-hosted-centos74
     steps:
       - name: Reset board
-        run: ${{ secrets.BF_COMMAND }} --log-file ${{ secrets.SCRATCH_PATH }}/logs/board_reset xrt-reset -n ${{ secrets.HOST }}
+        run: ${{ secrets.BF_COMMAND }} --log-file ${{ secrets.SCRATCH_PATH }}/logs/board_reset xrt-reset -n ${{ secrets.BF_HOST }}
         shell: bash
 
   install_centos74:
