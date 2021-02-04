@@ -27,7 +27,7 @@ jobs:
     runs-on: self-hosted-centos74
     steps:
       - name: Uninstall xrt rpms
-        run: sudo yum remove -y xrt xrt-aws
+        run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   
   install_centos74:
     environment: Test
@@ -39,7 +39,7 @@ jobs:
         with:
           name: xrt-rpm-centos74
       - name: Install xrt rpms
-        run: ls -al; sudo yum install -y ./*.rpm
+        run: ls -al; ${{ secrets.SUDO }} yum install -y ./*.rpm
 
   hw_emulation_tests:
     runs-on: self-hosted-centos74
