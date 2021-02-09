@@ -29,7 +29,7 @@ jobs:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   board_reset:
-    runs-on: self-hosted-centos74
+    runs-on: self-hosted-bf-runner
     steps:
       - name: Reset board
         run: ${{ secrets.BF_COMMAND }} --log-file ${{ secrets.SCRATCH_PATH }}/logs/board_reset xrt-reset -n ${{ secrets.BF_HOST }}
