@@ -55,10 +55,12 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: xrt-rpm-centos74
+      - name: Copy to bf 
+        run: scp ./*.rpm ${{ secrets.BF_HOST }}:/tmp
       - name: Run on board
-        run: ${{ secrets.BF_COMMAND }} --log-file /tmp/logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u200_qdma_201910_1 -r 2021.1 -x ./*-xrt.rpm --test_path /tmp/logs/tests --timeout 2400 --results-path test.OUTPUT
+        run: ${{ secrets.BF_COMMAND }} --log-file /tmp/logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u200_qdma_201910_1 -r 2021.1 -x /tmp/*-xrt.rpm --test_path /tmp/logs/tests --timeout 2400 --results-path test.OUTPUT
         shell: bash
-        
+
   hw_emulation_tests:
     runs-on: self-hosted-centos74
     needs: [install_centos74]
