@@ -27,7 +27,7 @@ jobs:
         name: xrt-rpm-${{ matrix.os }}
         path: build/Release/xrt_*-xrt.rpm
   uninstall_xrt:
-    runs-on: self-hosted-${{ matrix.os }}
+    runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
@@ -40,13 +40,13 @@ jobs:
 
   install_os:
     environment: Test
-    runs-on: self-hosted-${{ matrix.os }}
+    runs-on: self-hosted-docker-${{ matrix.os }}
     needs: [build_os, uninstall_xrt]
     steps:
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
         with:
-          name: xrt-rpm-c${{ matrix.os }}
+          name: xrt-rpm-${{ matrix.os }}
       - name: Install xrt rpms
         run: ls -al; ${{ secrets.SUDO }} yum install -y ./*.rpm
   board_test:
@@ -65,7 +65,7 @@ jobs:
         shell: bash
 
   hw_emulation_tests:
-    runs-on: self-hosted-${{ matrix.os }}
+    runs-on: self-hosted-docker-${{ matrix.os }}
     needs: [install_os]
     steps:
       - name: Run HW Emulation tests
