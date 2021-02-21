@@ -37,7 +37,7 @@ jobs:
 
   install_centos74:
     environment: Test
-    runs-on: self-hosted-centos74
+    runs-on: self-hosted-docker-centos74
     needs: [build_centos74, uninstall_xrt]
     steps:
       - name: Download XRT rpms
@@ -62,7 +62,7 @@ jobs:
         shell: bash
 
   hw_emulation_tests:
-    runs-on: self-hosted-centos74
+    runs-on: self-hosted-docker-centos74
     needs: [install_centos74]
     steps:
       - name: Run HW Emulation tests
