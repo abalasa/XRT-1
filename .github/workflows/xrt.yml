@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build_matrix:
     runs-on: self-hosted-docker-${{ matrix.os }}
     strategy:
       matrix:
@@ -26,22 +26,22 @@ jobs:
     - name: Stash files
       uses: actions/upload-artifact@v2
       with:
-        name: xrt-rpm-centos74
+        name: xrt-rpm-${{ matrix.os }}
         path: build/Release/xrt_*-xrt.rpm
   uninstall_xrt:
-    runs-on: self-hosted-docker-centos74
+    runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   install_centos74:
     environment: Test
-    runs-on: self-hosted-docker-centos74
-    needs: [build_centos74, uninstall_xrt]
+    runs-on: self-hosted-docker-${{ matrix.os }}
+    needs: [build_matrix, uninstall_xrt]
     steps:
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
         with:
-          name: xrt-rpm-centos74
+          name: xrt-rpm-${{ matrix.os }}
       - name: Install xrt rpms
         run: ls -al; ${{ secrets.SUDO }} yum install -y ./*.rpm
 
