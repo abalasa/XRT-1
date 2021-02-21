@@ -8,10 +8,10 @@ on:
 
 jobs:
   build_matrix:
-    runs-on: self-hosted-docker-${{ matrix.os }}
     strategy:
       matrix:
         os: [centos74, ubuntu2004]    
+    runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
@@ -31,11 +31,17 @@ jobs:
         name: xrt-rpm-${{ matrix.os }}
         path: build/Release/xrt_*-xrt.rpm
   uninstall_xrt:
+    strategy:
+      matrix:
+        os: [centos74, ubuntu2004]    
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   install_matrix:
+    strategy:
+      matrix:
+        os: [centos74, ubuntu2004]    
     environment: Test
     runs-on: self-hosted-docker-${{ matrix.os }}
     needs: [build_matrix, uninstall_xrt]
