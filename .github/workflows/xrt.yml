@@ -9,6 +9,9 @@ on:
 jobs:
   build_centos74:
     runs-on: self-hosted-docker-centos74
+    strategy:
+      matrix:
+        os: [centos74, ubuntu2004]    
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
@@ -17,7 +20,9 @@ jobs:
         sudo yum -y update
         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
     - name: XRT Build
-      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
+      run: echo ${{ matrix.os }}
+#    - name: XRT Build
+#      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
     - name: Stash files
       uses: actions/upload-artifact@v2
       with:
@@ -28,13 +33,6 @@ jobs:
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
-  board_reset:
-    runs-on: self-hosted-bf-runner
-    steps:
-      - name: Reset board
-        run: ${{ secrets.BF_COMMAND }} --log-file /tmp/logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
-        shell: bash
-
   install_centos74:
     environment: Test
     runs-on: self-hosted-docker-centos74
@@ -46,6 +44,13 @@ jobs:
           name: xrt-rpm-centos74
       - name: Install xrt rpms
         run: ls -al; ${{ secrets.SUDO }} yum install -y ./*.rpm
+
+  board_reset:
+    runs-on: self-hosted-bf-runner
+    steps:
+      - name: Reset board
+        run: ${{ secrets.BF_COMMAND }} --log-file /tmp/logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
+        shell: bash
   board_test:
     environment: Test
     runs-on: self-hosted-bf-runner
