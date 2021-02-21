@@ -33,7 +33,7 @@ jobs:
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
-  install_centos74:
+  install_matrix:
     environment: Test
     runs-on: self-hosted-docker-${{ matrix.os }}
     needs: [build_matrix, uninstall_xrt]
@@ -54,7 +54,7 @@ jobs:
   board_test:
     environment: Test
     runs-on: self-hosted-bf-runner
-    needs: [build_centos74, board_reset]
+    needs: [build_matrix, board_reset]
     steps:
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
@@ -67,8 +67,8 @@ jobs:
         shell: bash
 
   hw_emulation_tests:
-    runs-on: self-hosted-docker-centos74
-    needs: [install_centos74]
+    runs-on: self-hosted-docker-${{ matrix.os }}
+    needs: [install_matrix]
     steps:
       - name: Run HW Emulation tests
         run: |
