@@ -19,10 +19,12 @@ jobs:
       run: |
         sudo yum -y update
         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
-    - name: XRT Build
-      run: echo ${{ matrix.os }}
-#    - name: XRT Build
-#      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
+    - name: XRT Centos Build
+      if: ${{ matrix.os }} != 'centos74'
+      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
+    - name: XRT Ubuntu Build
+      if: ${{ matrix.os }} != 'ubuntu2004'
+      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
     - name: Stash files
       uses: actions/upload-artifact@v2
       with:
