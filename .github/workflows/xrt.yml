@@ -7,8 +7,8 @@ on:
     branches: [ master ]
 
 jobs:
-  build_centos74:
-    runs-on: self-hosted-docker-centos74
+  build:
+    runs-on: self-hosted-docker-${{ matrix.os }}
     strategy:
       matrix:
         os: [centos74, ubuntu2004]    
