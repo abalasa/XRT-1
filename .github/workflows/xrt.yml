@@ -24,7 +24,7 @@ jobs:
       run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
     - name: XRT Ubuntu Build
       if: ${{ matrix.os }} != 'ubuntu2004'
-      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
+      run: cd build && chmod +x build.sh ; ./build.sh
     - name: Stash files
       uses: actions/upload-artifact@v2
       with:
