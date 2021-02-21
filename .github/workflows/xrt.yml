@@ -24,7 +24,7 @@ jobs:
         name: xrt-rpm-centos74
         path: build/Release/xrt_*-xrt.rpm
   uninstall_xrt:
-    runs-on: self-hosted-centos74
+    runs-on: self-hosted-docker-centos74
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
