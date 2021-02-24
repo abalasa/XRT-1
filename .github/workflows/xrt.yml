@@ -10,7 +10,7 @@ jobs:
   build_matrix:
     strategy:
       matrix:
-        os: [centos74, ubuntu2004]
+        os: [centos74]
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -33,7 +33,7 @@ jobs:
   uninstall_xrt:
     strategy:
       matrix:
-        os: [centos74, ubuntu2004]      
+        os: [centos74]      
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
       - name: Uninstall xrt rpms
@@ -49,7 +49,7 @@ jobs:
     environment: Test
     strategy:
       matrix:
-        os: [centos74, ubuntu2004]        
+        os: [centos74]        
     runs-on: self-hosted-docker-${{ matrix.os }}
     needs: [build_matrix, uninstall_xrt]
     steps:
