@@ -42,7 +42,7 @@ jobs:
     runs-on: self-hosted-bf-runner
     steps:
       - name: Reset board
-        run: ${{ secrets.BF_COMMAND }} --log-file /tmp/logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
+        run: ls; # ${{ secrets.BF_COMMAND }} --log-file /tmp/logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
         shell: bash
 
   install_matrix:
@@ -67,7 +67,7 @@ jobs:
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
         with:
-          name: xrt-rpm-${{ matrix.os }}
+          name: xrt-rpm-centos74
       - name: Copy to bf 
         run: scp ./*.rpm ${{ secrets.BF_HOST }}:/home/${{ secrets.BF_USER }}/xrt-test-artifacts
       - name: Run on board
