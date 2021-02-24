@@ -77,7 +77,7 @@ jobs:
         shell: bash
 
   hw_emulation_tests:
-    runs-on: self-hosted-${{ matrix.os }}
+    runs-on: self-hosted-centos74
     needs: [install_matrix]
     steps:
       - name: Run HW Emulation tests
