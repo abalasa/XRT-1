@@ -41,7 +41,9 @@ jobs:
     runs-on: self-hosted-bf-runner
     steps:
       - name: Reset board
-        run: ls; # ${{ secrets.BF_COMMAND }} --log-file /tmp/logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
+        run: |
+          cd /scratch/bf-logs
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
         shell: bash
 
   install_matrix:
@@ -76,7 +78,7 @@ jobs:
       - name: Run on board
         run: |
           cd /scratch/bf-logs 
-          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --timeout 2400 --results-path /scratch/bf-logs/
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
         shell: bash
 
   hw_emulation_tests:
