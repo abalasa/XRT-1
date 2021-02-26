@@ -43,14 +43,14 @@ jobs:
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
-#   board_reset:
-#     runs-on: self-hosted-bf-runner
-#     steps:
-#       - name: Reset board
-#         run: |
-#           cd /scratch/bf-logs
-#           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
-#         shell: bash
+  board_reset:
+    runs-on: self-hosted-bf-runner
+    steps:
+      - name: Reset board
+        run: |
+          cd /scratch/bf-logs
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
+        shell: bash
 
   install_matrix:
     environment: Test
@@ -66,26 +66,26 @@ jobs:
           name: xrt-rpm-${{ matrix.os }}
       - name: Install xrt rpms
         run: ls -al; ${{ secrets.SUDO }} yum install -y ./*.rpm
-#   board_test:
-#     environment: Test
-#     runs-on: self-hosted-bf-runner
-#     needs: [build_matrix, board_reset]
-#     steps:
-#       - name: Download XRT rpms
-#         uses: actions/download-artifact@v2
-#         with:
-#           name: xrt-rpm-centos74
-#           path: /tmp/test-artifacts
-#       - name: Copy to bf 
-#         run: |
-#           pwd
-#           whoami
-#           scp /tmp/test-artifacts/*.rpm ${{ secrets.BF_HOST }}:/home/${{ secrets.BF_USER }}/xrt-test-artifacts
-#       - name: Run on board
-#         run: |
-#           cd /scratch/bf-logs 
-#           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
-#         shell: bash
+  board_test:
+    environment: Test
+    runs-on: self-hosted-bf-runner
+    needs: [build_matrix, board_reset]
+    steps:
+      - name: Download XRT rpms
+        uses: actions/download-artifact@v2
+        with:
+          name: xrt-rpm-centos74
+          path: /tmp/test-artifacts
+      - name: Copy to bf 
+        run: |
+          pwd
+          whoami
+          scp /tmp/test-artifacts/*.rpm ${{ secrets.BF_HOST }}:/home/${{ secrets.BF_USER }}/xrt-test-artifacts
+      - name: Run on board
+        run: |
+          cd /scratch/bf-logs 
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
+        shell: bash
 
   hw_emulation_tests:
     runs-on: self-hosted-centos74
