@@ -65,16 +65,16 @@ jobs:
     runs-on: self-hosted-bf-runner
     needs: [build_matrix, board_reset]
     steps:
-      - name: Download XRT rpms
-        uses: actions/download-artifact@v2
-        with:
-          name: xrt-rpm-centos74
-          path: /tmp/test-artifacts
-      - name: Copy to bf 
-        run: |
-          pwd
-          whoami
-          scp /tmp/test-artifacts/*.rpm ${{ secrets.BF_HOST }}:/home/${{ secrets.BF_USER }}/xrt-test-artifacts
+#       - name: Download XRT rpms
+#         uses: actions/download-artifact@v2
+#         with:
+#           name: xrt-rpm-centos74
+#           path: /tmp/test-artifacts
+#       - name: Copy to bf 
+#         run: |
+#           pwd
+#           whoami
+#           scp /tmp/test-artifacts/*.rpm ${{ secrets.BF_HOST }}:/home/${{ secrets.BF_USER }}/xrt-test-artifacts
       - name: Run on board
         run: |
           cd /scratch/bf-logs 
