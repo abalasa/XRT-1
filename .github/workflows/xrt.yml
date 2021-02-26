@@ -20,10 +20,16 @@ jobs:
         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
     - name: XRT Centos Build
       if: ${{ matrix.os == 'centos74' }}
-      run: cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
+      run: |
+        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+        cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
+      shell: bash
     - name: XRT Ubuntu Build
       if: ${{ matrix.os == 'ubuntu2004' }}
-      run: cd build && chmod +x build.sh ; ./build.sh
+      run: |
+        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+        cd build && chmod +x build.sh ; ./build.sh
+      shell: bash
     - name: Stash files
       uses: actions/upload-artifact@v2
       with:
@@ -37,14 +43,14 @@ jobs:
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
-  board_reset:
-    runs-on: self-hosted-bf-runner
-    steps:
-      - name: Reset board
-        run: |
-          cd /scratch/bf-logs
-          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
-        shell: bash
+#   board_reset:
+#     runs-on: self-hosted-bf-runner
+#     steps:
+#       - name: Reset board
+#         run: |
+#           cd /scratch/bf-logs
+#           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
+#         shell: bash
 
   install_matrix:
     environment: Test
@@ -60,11 +66,11 @@ jobs:
           name: xrt-rpm-${{ matrix.os }}
       - name: Install xrt rpms
         run: ls -al; ${{ secrets.SUDO }} yum install -y ./*.rpm
-  board_test:
-    environment: Test
-    runs-on: self-hosted-bf-runner
-    needs: [build_matrix, board_reset]
-    steps:
+#   board_test:
+#     environment: Test
+#     runs-on: self-hosted-bf-runner
+#     needs: [build_matrix, board_reset]
+#     steps:
 #       - name: Download XRT rpms
 #         uses: actions/download-artifact@v2
 #         with:
@@ -75,11 +81,11 @@ jobs:
 #           pwd
 #           whoami
 #           scp /tmp/test-artifacts/*.rpm ${{ secrets.BF_HOST }}:/home/${{ secrets.BF_USER }}/xrt-test-artifacts
-      - name: Run on board
-        run: |
-          cd /scratch/bf-logs 
-          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
-        shell: bash
+#       - name: Run on board
+#         run: |
+#           cd /scratch/bf-logs 
+#           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
+#         shell: bash
 
   hw_emulation_tests:
     runs-on: self-hosted-centos74
