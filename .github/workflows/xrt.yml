@@ -15,7 +15,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
-      if: steps.cache-sha.outputs.cache-hit != 'true'
       run: |
         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
     - name: XRT Centos Build
