@@ -1,4 +1,4 @@
-name: Dayeh XRT Build/Install Test CI 
+name: Dayeh XRT Build/Install Test CI
 
 on:
   push:
