@@ -27,8 +27,8 @@ jobs:
     - name: XRT Windows Build
       if: ${{ matrix.os == 'windows10' }}
       run: >-
+        call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat
         cd build
-        call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
         build.bat -release
       shell: cmd
     - name: XRT Ubuntu Build
