@@ -24,7 +24,7 @@ jobs:
         cd build && chmod +x build.sh ; scl enable devtoolset-9 -- bash -c ./build.sh
       shell: bash
     - name: XRT Windows Build
-      if: ${{ matrix.os == 'win10' }}
+      if: ${{ matrix.os == 'windows10' }}
       run: |
         C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat   & build.bat -release 
     - name: XRT Ubuntu Build
