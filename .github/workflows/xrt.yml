@@ -15,6 +15,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Install dependencies
+      if: ${{ matrix.os != 'windows10' }}
       run: |
         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
     - name: XRT Centos Build
