@@ -10,7 +10,7 @@ jobs:
   build_lnx_matrix:
     strategy:
       matrix:
-        os: [centos74, centos8, ubuntu2004]
+        os: [centos74, centos8]
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
