@@ -10,7 +10,7 @@ jobs:
   build_matrix:
     strategy:
       matrix:
-        os: [centos74, ubuntu2004, amazonlinux2]    
+        os: [centos74, amazonlinux2]    
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -36,7 +36,7 @@ jobs:
   uninstall_xrt:
     strategy:
       matrix:
-        os: [centos74, ubuntu2004, amazonlinux2]    
+        os: [centos74, amazonlinux2]    
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
       - name: Uninstall xrt rpms
@@ -44,7 +44,7 @@ jobs:
   install_matrix:
     strategy:
       matrix:
-        os: [centos74, ubuntu2004, amazonlinux2]    
+        os: [centos74, amazonlinux2]    
     environment: Test
     runs-on: self-hosted-docker-${{ matrix.os }}
     needs: [build_matrix, uninstall_xrt]
@@ -80,7 +80,7 @@ jobs:
   hw_emulation_tests:
     strategy:
       matrix:
-        os: [centos74, ubuntu2004, amazonlinux2]    
+        os: [centos74, amazonlinux2]    
     runs-on: self-hosted-docker-${{ matrix.os }}
     needs: [install_matrix]
     steps:
