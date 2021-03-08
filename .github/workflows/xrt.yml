@@ -13,6 +13,10 @@ jobs:
         os: [centos74, centos8]
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
+    - name: Runner workspace path
+      run: |
+        echo "Cleaning up previous run"
+        rm -rf "${{ github.workspace }}"
     - uses: actions/checkout@v2
     - name: Install dependencies
       run: |
@@ -57,6 +61,12 @@ jobs:
         os: [windows10]      
     runs-on: self-hosted-${{ matrix.os }}
     steps:
+#       - name: Runner workspace path
+#         run: >-
+#           echo "Cleaning up previous run" &
+#           @RD /S /Q "${{ github.workspace }}"
+#         shell: cmd
+      - uses: actions/checkout@v2
       - name: XRT Windows Build
         run: >-
           call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
