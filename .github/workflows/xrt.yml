@@ -46,7 +46,7 @@ jobs:
     strategy:
       matrix:
         os: [zynq]      
-    runs-on: self-hosted-docker-{{ matrix.os }}
+    runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
     - name: XRT for Edge platform Build
