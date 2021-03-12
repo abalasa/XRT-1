@@ -10,7 +10,7 @@ jobs:
   build_lnx_matrix:
     strategy:
       matrix:
-        os: [al2]
+        os: [al2, ubuntu2004]
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
