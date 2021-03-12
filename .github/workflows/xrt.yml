@@ -10,7 +10,7 @@ jobs:
   build_lnx_matrix:
     strategy:
       matrix:
-        os: [al2, ubuntu2004]
+        os: [al2, ubuntu2004, centos8]
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -26,7 +26,6 @@ jobs:
     - name: XRT Build
       if: ${{ matrix.os == 'centos8' || matrix.os == 'ubuntu2004' || matrix.os == 'al2' }}
       run: |
-        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
         cd build && chmod +x build.sh && ./build.sh
       shell: bash
     - name: Stash files Centos
