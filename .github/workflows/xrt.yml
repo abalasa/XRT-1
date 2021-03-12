@@ -128,7 +128,7 @@ jobs:
       matrix:
         os: [windows10]      
     runs-on: self-hosted-${{ matrix.os }}
-    needs: [build_win]
+    needs: [build_win_matrix]
     steps:
       - name: Download XRT win exes
         uses: actions/download-artifact@v2
