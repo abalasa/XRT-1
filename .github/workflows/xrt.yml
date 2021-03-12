@@ -44,8 +44,8 @@ jobs:
       if: ${{ always() }}
       run: |
         echo "Cleaning up previous run"
-        rm -rf "$GITHUB_WORKSPACE/Debug" 
-        rm -rf "$GITHUB_WORKSPACE/Release"
+        rm -rf "$GITHUB_WORKSPACE/build/Debug" 
+        rm -rf "$GITHUB_WORKSPACE/build/Release"
       shell: bash
 
 #   build_xrt_edge:
