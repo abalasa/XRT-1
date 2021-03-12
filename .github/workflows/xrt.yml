@@ -14,8 +14,6 @@ jobs:
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
-    - name: Perform Scan
-      uses: ShiftLeftSecurity/scan-action@master
     - name: Install dependencies
       run: |
         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
