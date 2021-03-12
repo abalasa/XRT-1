@@ -46,6 +46,13 @@ jobs:
         echo "Cleaning up previous run"
         rm -rf "${{ github.workspace }}"
       shell: bash
+    - name: Cleanup workspace Release and Debug dirs
+      if: ${{ always() }}
+      run: |
+        echo "Cleaning up previous run"
+        rm -rf "$GITHUB_WORKSPACE/Debug" 
+        rm -rf "$GITHUB_WORKSPACE/Release"
+      shell: bash
   
   uninstall_lnx_xrt:
     strategy:
