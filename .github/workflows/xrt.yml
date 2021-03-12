@@ -13,7 +13,6 @@ jobs:
         os: [centos74, centos8]
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
-    - uses: AutoModality/action-clean@v1
     - uses: actions/checkout@v2
     - name: Install dependencies
       run: |
