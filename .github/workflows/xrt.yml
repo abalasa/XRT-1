@@ -24,7 +24,13 @@ jobs:
         cd build && chmod +x build.sh && scl enable devtoolset-9 -- bash -c ./build.sh
       shell: bash
     - name: XRT Build
-      if: ${{ matrix.os == 'centos8' || matrix.os == 'ubuntu2004' || matrix.os == 'al2' }}
+      if: ${{ matrix.os == 'centos8' }}
+      run: |
+        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+        cd build && chmod +x build.sh && ./build.sh
+      shell: bash
+    - name: XRT Build
+      if: ${{ matrix.os == 'ubuntu2004' || matrix.os == 'al2' }}
       run: |
         cd build && chmod +x build.sh && ./build.sh
       shell: bash
