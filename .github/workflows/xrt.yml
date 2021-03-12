@@ -124,11 +124,5 @@ jobs:
           cd /scratch/tests/PCIE_VITIS_DSV_XRT_hw_emu_lin_lin_x86_20210128_035800_XRT_XILINX_U50_GEN3X16_XDMA_201920_3_MISC_lnx64/
           export XCL_EMULATION_MODE=hw_emu; ./host.exe -d acc -k kernel.xclbin
           #cd /scratch/xrt_tests
-          
-          sdfadsfadsfdsafsadfsdfdsf
-          dfasfdsafds
-      dfsadf
-      sdfasfd
-      
           #${{ secrets.PYTHON }} xrt.py --chooseEmu HW_EMU --runTest True
         shell: bash
