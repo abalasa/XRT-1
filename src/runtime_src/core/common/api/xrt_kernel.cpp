@@ -20,6 +20,7 @@
 #define XCL_DRIVER_DLL_EXPORT  // exporting xrt_kernel.h
 #define XRT_CORE_COMMON_SOURCE // in same dll as core_common
 #include "core/include/experimental/xrt_kernel.h"
+#include "kernel_int.h"
 
 #include "command.h"
 #include "exec.h"
@@ -48,7 +49,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
-#include <sstream>
+#include <fstream>
 #include <type_traits>
 #include <utility>
 using namespace std::chrono_literals;
@@ -126,16 +127,28 @@ constexpr size_t operator"" _kb(unsigned long long v)  { return 1024u * v; }
 
 XRT_CORE_UNUSED // debug enabled function
 std::string
-debug_cmd_packet(const ert_packet* pkt)
+debug_cmd_packet(const std::string& msg, const ert_packet* pkt)
 {
-  std::ostringstream ostr;
+  static auto fnm = std::getenv("MBS_PRINT_REGMAP");
+  if (!fnm)
+    return "";
+
+  std::ofstream ostr(fnm,std::ios::app);
+  //std::ostringstream ostr;
+  ostr << msg << "\n";
   ostr << std::uppercase << std::setfill('0') << std::setw(3);
   ostr << "pkt->header    = 0x"
        << std::setw(8) << std::hex << pkt->header << std::dec << "\n";
   for (size_t i = 0; i < pkt->count; ++i)
     ostr << "pkt->data[" << std::setw(3) << i << "] = 0x"
          << std::setw(8) << std::hex << pkt->data[i] << std::dec << "\n";
-  return ostr.str();
+  return fnm;
+}
+
+inline IP_CONTROL
+get_ip_control(const ip_data* ip)
+{
+  return IP_CONTROL((ip->properties & IP_CONTROL_MASK) >> IP_CONTROL_SHIFT);
 }
 
 // Helper class for representing an in-memory kernel argument.  User
@@ -153,16 +166,31 @@ debug_cmd_packet(const ert_packet* pkt)
 //
 // The key here is that arg_range is zero-copy, it simply wraps caller
 // storage used from the argument while provide an iterator interface.
+//
+// Note that in order to avoid ABR, host size (bytes) must be multiple
+// sizeof(ValueType).  It is tempting to use ValueType matching the
+// kernel register entry size (uint32_t), but host size can be byte
+// aligned (e.g. single char) and if rounded up to sizeof(ValueType)
+// it would result in reading junk data past the allocated bytes.
 template <typename ValueType>
 class arg_range
 {
   const ValueType* uval;
   size_t words;
 
+  // Number of bytes must multiple of sizeof(ValueType)
+  size_t
+  validate_bytes(size_t bytes)
+  {
+    if (bytes % sizeof(ValueType))
+      throw std::runtime_error("arg_range unaligned bytes");
+    return bytes;
+  }
+
 public:
   arg_range(const void* value, size_t bytes)
     : uval(reinterpret_cast<const ValueType*>(value))
-    , words(bytes / sizeof(ValueType))
+    , words(validate_bytes(bytes) / sizeof(ValueType))
   {}
 
   const ValueType*
@@ -227,16 +255,35 @@ struct device_type
 {
   std::shared_ptr<xrt_core::device> core_device;
   xrt_core::bo_cache exec_buffer_cache;
+  uint32_t uid; // internal unique id for debug
+
+  static uint32_t
+  create_uid()
+  {
+    static std::atomic<uint32_t> count {0};
+    return count++;
+  }
 
   device_type(xrtDeviceHandle dhdl)
     : core_device(xrt_core::device_int::get_core_device(dhdl))
     , exec_buffer_cache(core_device->get_device_handle(), 128)
-  {}
+    , uid(create_uid())
+  {
+    XRT_DEBUGF("device_type::device_type(%d)\n", uid);
+  }
 
   device_type(const std::shared_ptr<xrt_core::device>& cdev)
     : core_device(cdev)
     , exec_buffer_cache(core_device->get_device_handle(), 128)
-  {}
+    , uid(create_uid())
+  {
+    XRT_DEBUGF("device_type::device_type(%d)\n", uid);
+  }
+
+  ~device_type()
+  {
+    XRT_DEBUGF("device_type::~device_type(%d)\n", uid);
+  }
 
   template <typename CommandType>
   xrt_core::bo_cache::cmd_bo<CommandType>
@@ -252,6 +299,45 @@ struct device_type
   }
 };
 
+// struct encoded_bitset - Sparse bit set
+//
+// Used to represent compressed mem_topology indidices of an xclbin.
+// Many entries are unused and can be ignored, yet section size
+// (indices) can be arbitrary long.  The encoding is a mapping from
+// original index to compressed index.
+//
+// Using this encoded bitset allows a smaller sized std::bitset
+// to be used for representing memory connectivity, where as a
+// uncompressed bitset would require 1000s of entries.
+template <size_t size>
+class encoded_bitset
+{
+public:
+  encoded_bitset()
+  {}
+
+  // Encoding is represented using a vector  that maps
+  // the original index to the encoded (compressed) index.
+  encoded_bitset(const std::vector<size_t>* enc)
+    : m_encoding(enc)
+  {}
+
+  void
+  set(size_t idx)
+  {
+    m_bitset.set(m_encoding ? m_encoding->at(idx) : idx);
+  }
+
+  bool
+  test(size_t idx) const
+  {
+    return m_bitset.test(m_encoding ? m_encoding->at(idx) : idx);
+  }
+
+private:
+  const std::vector<size_t>* m_encoding = nullptr;
+  std::bitset<size> m_bitset;
+};
 
 // struct ip_context - Manages process access to CUs
 //
@@ -266,23 +352,28 @@ struct device_type
 class ip_context
 {
   // class connectivy - Represents argument connectiviy to memory banks
-  //  
-  // TODO: compress the connectivity bitset to ignore unused memory banks
+  //
+  // The argument connectivity is represented using a compressed bitset
+  // where unused mem_topology entries have been removed.  This allows
+  // for a much smaller bitset to represented all possible connectivity
+  //
+  // @connections: connectivity for each ip argument
+  // @default_connection: default connectivity for an argument
   class connectivity
   {
     static constexpr int32_t no_memidx = -1;
-    static constexpr size_t max_connections = 128;
-    std::vector<std::bitset<max_connections>> connections; // sorted argidx
-    std::vector<int32_t> default_connection;               // sorted argidx
+    static constexpr size_t max_connections = 64;
+    std::vector<encoded_bitset<max_connections>> connections; // indexed by argidx
+    std::vector<int32_t> default_connection;                  // indexed by argidx
 
     // Resize the vectors if neccessary
     void
-    resize(size_t size)
+    resize(size_t size, const std::vector<size_t>* encoding)
     {
       if (connections.size() >= size)
         return;
 
-      connections.resize(size);
+      connections.resize(size, {encoding});
       default_connection.resize(size, no_memidx);
     }
 
@@ -290,8 +381,13 @@ class ip_context
     connectivity()
     {}
 
-    connectivity(const ::connectivity* conn, int32_t ipidx)
+    // @device: core device
+    // @conn: connectivity section of xclbin
+    // @ipidx: index of the ip for which connectivity data is created
+    connectivity(const xrt_core::device* device, const xrt::uuid& xclbin_id, int32_t ipidx)
     {
+      const auto& memidx_encoding = device->get_memidx_encoding(xclbin_id);
+      auto conn = device->get_axlf_section_or_error<const ::connectivity*>(ASK_GROUP_CONNECTIVITY, xclbin_id);
       // Compute the connections for IP with specified index
       for (int count = 0; count < conn->m_count; ++count) {
         auto& cxn  = conn->m_connection[count];
@@ -300,7 +396,13 @@ class ip_context
 
         auto argidx = cxn.arg_index;
         auto memidx = cxn.mem_data_index;
-        resize(argidx + 1);
+
+        // disregard memory indices that do not map to a memory mapped bank
+        // this could be streaming connections
+        if (memidx_encoding.at(memidx) == std::numeric_limits<size_t>::max())
+          continue;
+
+        resize(argidx + 1, &memidx_encoding);
         connections[argidx].set(memidx);
 
         // default connections is largest memidx to account for groups
@@ -308,20 +410,24 @@ class ip_context
       }
     }
 
+    // Get default memory index of an argument.  The default index is
+    // the the largest memory index of a connection for specified argument.
     int32_t
     get_arg_memidx(size_t argidx) const
     {
       return default_connection[argidx];
     }
 
+    // Validate that specified memory index is a valid connection for
+    // argument identified by 'argidx'
     bool
     valid_arg_connection(size_t argidx, size_t memidx) const
     {
       return connections[argidx].test(memidx);
     }
   };
-  
-  
+
+
 public:
   using access_mode = xrt::kernel::cu_access_mode;
   constexpr static unsigned int virtual_cu_idx = std::numeric_limits<unsigned int>::max();
@@ -331,14 +437,12 @@ public:
   // @device:    Device on which context should opened
   // @xclbin_id: UUID of xclbin containeing the IP definition
   // @ip:        The ip_data defintion for this IP from the xclbin
-  // @conn:      The connectivity section from xclbin
-  // @cuidx:     Sorted index of CU used when populating cmd pkt
   // @ipidx:     Index of IP in the IP_LAYOUT section of xclbin
+  // @cuidx:     Sorted index of CU used when populating cmd pkt
   // @am:        Access mode, how this CU should be opened
   static std::shared_ptr<ip_context>
   open(xrt_core::device* device, const xrt::uuid& xclbin_id,
-       const ip_data* ip, const ::connectivity* conn,
-       unsigned int ipidx, unsigned int cuidx, access_mode am)
+       const ip_data* ip, unsigned int ipidx, unsigned int cuidx, access_mode am)
   {
     static std::mutex mutex;
     static std::map<xrt_core::device*, std::array<std::weak_ptr<ip_context>, 128>> dev2ips;
@@ -346,7 +450,7 @@ public:
     auto& ips = dev2ips[device];
     auto ipctx = ips[cuidx].lock();
     if (!ipctx) {
-      ipctx = std::shared_ptr<ip_context>(new ip_context(device, xclbin_id, ip, conn, ipidx, cuidx, am));
+      ipctx = std::shared_ptr<ip_context>(new ip_context(device, xclbin_id, ip, ipidx, cuidx, am));
       ips[cuidx] = ipctx;
     }
 
@@ -436,10 +540,9 @@ public:
 private:
   // regular CU
   ip_context(xrt_core::device* dev, const xrt::uuid& xclbin_id,
-             const ip_data* ip, const ::connectivity* conn,
-             unsigned int ipindex, unsigned int cuindex, access_mode am)
+             const ip_data* ip, unsigned int ipindex, unsigned int cuindex, access_mode am)
     : device(dev), xid(xclbin_id)
-    , args(conn, ipindex), cuidx(cuindex)
+    , args(dev, xclbin_id, ipindex), cuidx(cuindex)
     , address(ip->m_base_address), size(64_kb), access(am)
   {
     if (access != access_mode::none)
@@ -452,8 +555,8 @@ private:
   {
     device->open_context(xid.get(), cuidx, std::underlying_type<access_mode>::type(access));
   }
-    
-  xrt_core::device* device; // 
+
+  xrt_core::device* device; //
   xrt::uuid xid;            // xclbin uuid
   connectivity args;        // argument memory connections
   unsigned int cuidx;       // cu index for execution
@@ -464,7 +567,7 @@ private:
 
 // Remove when c++17
 constexpr int32_t ip_context::connectivity::no_memidx;
-  
+
 // class kernel_command - Immplements command API expected by schedulers
 //
 // The kernel command is
@@ -476,7 +579,7 @@ public:
   using callback_list = std::vector<callback_function_type>;
 
 public:
-  kernel_command(device_type* dev)
+  kernel_command(const std::shared_ptr<device_type>& dev)
     : m_device(dev)
     , m_execbuf(m_device->create_exec_buf<ert_start_kernel_cmd>())
     , m_done(true)
@@ -527,7 +630,7 @@ public:
   // Add a callback, synchronize with concurrent state change
   // Call the callback if command is complete.
   void
-  add_callback(callback_function_type fcn)
+  add_callback(callback_function_type&& fcn)
   {
     bool complete = false;
     ert_cmd_state state;
@@ -536,16 +639,22 @@ public:
       if (!m_callbacks)
         m_callbacks = std::make_unique<callback_list>();
       m_callbacks->emplace_back(std::move(fcn));
-      complete = m_done;
       auto pkt = get_ert_packet();
       state = static_cast<ert_cmd_state>(pkt->state);
-      if (complete && state < ERT_CMD_STATE_COMPLETED)
-        throw std::runtime_error("Unexpected state");
+      complete = m_done && state >= ERT_CMD_STATE_COMPLETED;
     }
 
     // lock must not be helt while calling callback function
     if (complete)
       m_callbacks.get()->back()(state);
+  }
+
+  // Remove last added callback
+  void
+  pop_callback()
+  {
+    if (m_callbacks && m_callbacks->size())
+      m_callbacks->pop_back();
   }
 
   // set_event() - enqueued notifcation of event
@@ -677,7 +786,7 @@ public:
   }
 
 private:
-  device_type* m_device = nullptr;
+  std::shared_ptr<device_type> m_device;
   mutable std::shared_ptr<xrt::event_impl> m_event;
   execbuf_type m_execbuf; // underlying execution buffer
   unsigned int m_uid = 0;
@@ -712,7 +821,7 @@ public:
   struct setter
   {
     virtual void
-    set_arg_value(const argument& arg, const arg_range<uint32_t>& value) = 0;
+    set_arg_value(const argument& arg, const arg_range<uint8_t>& value) = 0;
   };
 
 private:
@@ -749,7 +858,7 @@ private:
     set(setter* setter, const argument& arg, std::va_list* args) const
     {
       HostType value = va_arg(*args, VaArgType);
-      setter->set_arg_value(arg, arg_range<uint32_t>{&value, sizeof(value)});
+      setter->set_arg_value(arg, arg_range<uint8_t>{&value, sizeof(value)});
     }
   };
 
@@ -773,18 +882,16 @@ private:
     set(setter* setter, const argument& arg, std::va_list* args) const
     {
       HostType* value = va_arg(*args, VaArgType*);
-      setter->set_arg_value(arg, arg_range<uint32_t>{value, size});
+      setter->set_arg_value(arg, arg_range<uint8_t>{value, size});
     }
   };
 
   struct global_type : iarg
   {
-    xrt_core::device* core_device;
     size_t size;   // size in bytes of argument per xclbin
 
-    global_type(xrt_core::device* dev, size_t bytes)
-      : core_device(dev)
-      , size(bytes)
+    global_type(size_t bytes)
+      : size(bytes)
     {}
 
     virtual std::vector<uint32_t>
@@ -805,7 +912,7 @@ private:
 
       auto bo = va_arg(*args, xrtBufferHandle);
       auto addr = xrt_core::bo::address(bo);
-      setter->set_arg_value(arg, arg_range<uint32_t>{&addr, sizeof(addr)});
+      setter->set_arg_value(arg, arg_range<uint8_t>{&addr, sizeof(addr)});
     }
   };
 
@@ -841,7 +948,7 @@ public:
     : arg(std::move(rhs.arg)), content(std::move(rhs.content))
   {}
 
-  argument(xrt_core::device* dev, xarg&& karg)
+  argument(xarg&& karg)
     : arg(std::move(karg))
   {
     // Determine type
@@ -873,14 +980,22 @@ public:
       break;
     }
     case xarg::argtype::global :
-      content = std::make_unique<global_type>(dev, arg.size);
+    case xarg::argtype::constant :
+      content = std::make_unique<global_type>(arg.size);
       break;
-    case xarg::argtype::stream :
+    case xarg::argtype::local :  // local memory
+    case xarg::argtype::stream : // stream connection
       content = std::make_unique<null_type>();
       break;
     default:
       throw std::runtime_error("Unexpected error");
     }
+  }
+
+  const xarg&
+  get_xarg() const
+  {
+    return arg;
   }
 
   void
@@ -945,6 +1060,10 @@ public:
   bool
   is_output() const
   { return arg.dir == direction::output; }
+
+  xarg::argtype
+  type() const
+  { return arg.type; }
 };
 
 } // namespace
@@ -973,6 +1092,7 @@ class kernel_impl
   size_t fa_output_entry_bytes = 0;    // Fast adapter output desc bytes
   size_t num_cumasks = 1;              // Required number of command cu masks
   uint32_t protocol = 0;               // Default opcode
+  uint32_t uid;                        // internal unique id for debug
 
   // Compute data for FAST_ADAPTER descriptor use (see ert_fa.h)
   //
@@ -989,7 +1109,7 @@ class kernel_impl
     // remove last argument which is "nextDescriptorAddr" and
     // not set by user
     args.pop_back();
-    
+
     size_t desc_offset = 0;
 
     // process inputs, compute descriptor entry offset
@@ -1044,10 +1164,12 @@ class kernel_impl
   IP_CONTROL
   get_ip_control(const std::vector<const ip_data*>& ips)
   {
-    // assert ( ips.size() >= 1);
-    auto ctrl = IP_CONTROL((ips[0]->properties & IP_CONTROL_MASK) >> IP_CONTROL_SHIFT);
+    if (ips.empty())
+      return AP_CTRL_NONE;
+
+    auto ctrl = ::get_ip_control(ips[0]);
     for (size_t idx = 1; idx < ips.size(); ++idx)
-      if (IP_CONTROL((ips[0]->properties & IP_CONTROL_MASK) >> IP_CONTROL_SHIFT) != ctrl)
+      if (IP_CONTROL((ips[idx]->properties & IP_CONTROL_MASK) >> IP_CONTROL_SHIFT) != ctrl)
         throw std::runtime_error("CU control protocol mismatch");
 
     return ctrl;
@@ -1060,6 +1182,7 @@ class kernel_impl
     kcmd->count = num_cumasks + regmap_size;
     kcmd->opcode = (protocol == FAST_ADAPTER) ? ERT_START_FA : ERT_START_CU;
     kcmd->type = ERT_CU;
+    kcmd->state = ERT_CMD_STATE_NEW;
   }
 
   void
@@ -1073,6 +1196,12 @@ class kernel_impl
     desc->output_entry_bytes = fa_output_entry_bytes;
   }
 
+  static uint32_t
+  create_uid()
+  {
+    static std::atomic<uint32_t> count {0};
+    return count++;
+  }
 
 public:
   // kernel_type - constructor
@@ -1085,16 +1214,15 @@ public:
     : device(std::move(dev))                                   // share ownership
     , name(nm.substr(0,nm.find(":")))                          // filter instance names
     , vctx(ip_context::open_virtual_cu(device->core_device.get(), xclbin_id))
+    , uid(create_uid())
   {
+    XRT_DEBUGF("kernel_impl::kernel_impl(%d)\n" , uid);
+
     // ip_layout section for collecting CUs
     auto ip_section = device->core_device->get_axlf_section(IP_LAYOUT, xclbin_id);
     if (!ip_section.first)
       throw std::runtime_error("No ip layout available to construct kernel, make sure xclbin is loaded");
     auto ip_layout = reinterpret_cast<const ::ip_layout*>(ip_section.first);
-
-    // connectivity section for CU memory connectivity, permissible for section to not exist
-    auto connectivity_section = device->core_device->get_axlf_section(ASK_GROUP_CONNECTIVITY, xclbin_id);
-    auto connectivity = reinterpret_cast<const ::connectivity*>(connectivity_section.first);
 
     // xml section for kernel arguments
     auto xml_section = device->core_device->get_axlf_section(EMBEDDED_METADATA, xclbin_id);
@@ -1108,12 +1236,14 @@ public:
 
     auto all_cus = xrt_core::xclbin::get_cus(ip_layout);  // sort order
     for (const ip_data* cu : kernel_cus) {
+      if (::get_ip_control(cu) == AP_CTRL_NONE)
+        continue;
       auto itr = std::find(all_cus.begin(), all_cus.end(), cu->m_base_address);
       if (itr == all_cus.end())
         throw std::runtime_error("unexpected error");
       auto cuidx = std::distance(all_cus.begin(), itr);         // sort order index
       auto ipidx = std::distance(ip_layout->m_ip_data, cu); // ip_layout index
-      ipctxs.emplace_back(ip_context::open(device->get_core_device(), xclbin_id, cu, connectivity, ipidx, cuidx, am));
+      ipctxs.emplace_back(ip_context::open(device->get_core_device(), xclbin_id, cu, ipidx, cuidx, am));
       cumask.set(cuidx);
       num_cumasks = std::max<size_t>(num_cumasks, (cuidx / 32) + 1);
     }
@@ -1132,11 +1262,16 @@ public:
     // compute regmap size, convert to typed argument
     for (auto& arg : xrt_core::xclbin::get_kernel_arguments(xml_section.first, xml_section.second, name)) {
       regmap_size = std::max(regmap_size, (arg.offset + arg.size) / 4);
-      args.emplace_back(device->get_core_device(), std::move(arg));
+      args.emplace_back(std::move(arg));
     }
 
     // amend args with computed data based on kernel protocol
     amend_args();
+  }
+
+  ~kernel_impl()
+  {
+    XRT_DEBUGF("kernel_impl::~kernel_impl(%d)\n" , uid);
   }
 
   // Initialize kernel command and return pointer to payload
@@ -1155,13 +1290,19 @@ public:
     return data;
   }
 
+  std::string
+  get_name() const
+  {
+    return name;
+  }
+
   const std::bitset<128>&
   get_cumask() const
   {
     return cumask;
   }
 
-  size_t 
+  size_t
   get_num_cumasks() const
   {
     return num_cumasks;
@@ -1233,10 +1374,10 @@ public:
       out[n] = read_register(offset + n * 4, true);
   }
 
-  device_type*
+  const std::shared_ptr<device_type>&
   get_device() const
   {
-    return device.get();
+    return device;
   }
 
   xrt_core::device*
@@ -1252,10 +1393,11 @@ public:
   }
 
   const argument&
-  get_arg(size_t argidx) const
+  get_arg(size_t argidx, bool nocheck=false) const
   {
     auto& arg = args.at(argidx);
-    arg.valid_or_error();
+    if (!nocheck)
+      arg.valid_or_error();
     return arg;
   }
 };
@@ -1277,14 +1419,17 @@ class run_impl
   // protocol.
   struct arg_setter : argument::setter
   {
-    uint32_t* data;
+    uint8_t* data;
 
     arg_setter(uint32_t* d)
-      : data(d)
+      : data(reinterpret_cast<uint8_t*>(d))
     {}
 
     virtual void
-    set_arg_value(const argument& arg, const arg_range<uint32_t>& value) = 0;
+    set_arg_value(const argument& arg, const arg_range<uint8_t>& value) = 0;
+
+    virtual arg_range<uint8_t>
+    get_arg_value(const argument& arg) = 0;
   };
 
   // AP_CTRL_HS, AP_CTRL_CHAIN
@@ -1295,11 +1440,18 @@ class run_impl
     {}
 
     virtual void
-    set_arg_value(const argument& arg, const arg_range<uint32_t>& value)
+    set_arg_value(const argument& arg, const arg_range<uint8_t>& value)
     {
-      auto cmdidx = arg.offset() / 4;
-      auto count = std::min(arg.size() / sizeof(uint32_t), value.size());
+      auto cmdidx = arg.offset();
+      auto count = std::min(arg.size(), value.size());
       std::copy_n(value.begin(), count, data + cmdidx);
+    }
+
+    virtual arg_range<uint8_t>
+    get_arg_value(const argument& arg)
+    {
+      auto cmdidx = arg.offset();
+      return { data + cmdidx, arg.size() };
     }
   };
 
@@ -1311,16 +1463,31 @@ class run_impl
     {}
 
     virtual void
-    set_arg_value(const argument& arg, const arg_range<uint32_t>& value)
+    set_arg_value(const argument& arg, const arg_range<uint8_t>& value)
     {
       auto desc = reinterpret_cast<ert_fa_descriptor*>(data);
       auto desc_entry = reinterpret_cast<ert_fa_desc_entry*>(desc->data + arg.fa_desc_offset() / sizeof(uint32_t));
       desc_entry->arg_offset = arg.offset();
       desc_entry->arg_size = arg.size();
-      auto count = std::min(arg.size() / sizeof(uint32_t), value.size());
-      std::copy_n(value.begin(), count, desc_entry->arg_value);
+      auto count = std::min(arg.size(), value.size());
+      std::copy_n(value.begin(), count, reinterpret_cast<uint8_t*>(desc_entry->arg_value));
+    }
+
+    virtual arg_range<uint8_t>
+    get_arg_value(const argument& arg)
+    {
+      auto desc = reinterpret_cast<ert_fa_descriptor*>(data);
+      auto desc_entry = reinterpret_cast<ert_fa_desc_entry*>(desc->data + arg.fa_desc_offset() / sizeof(uint32_t));
+      return { reinterpret_cast<uint8_t*>(desc_entry->arg_value), arg.size() };
     }
   };
+
+  static uint32_t
+  create_uid()
+  {
+    static std::atomic<uint32_t> count {0};
+    return count++;
+  }
 
   std::unique_ptr<arg_setter>
   make_arg_setter()
@@ -1358,7 +1525,21 @@ class run_impl
     ips.erase(itr,ips.end());
     encode_cumasks = true;
   }
-  
+
+  // Clone the commmand packet of another run_impl
+  // Used when constructing a run_impl from another run_impl
+  // for concurrent execution
+  uint32_t*
+  clone_command_data(const run_impl* rhs)
+  {
+    auto pkt = cmd->get_ert_packet();
+    auto rhs_pkt = rhs->cmd->get_ert_packet();
+    pkt->header = rhs_pkt->header;
+    pkt->state = ERT_CMD_STATE_NEW;
+    std::copy_n(rhs_pkt->data, rhs_pkt->count, pkt->data);
+    return pkt->data + (rhs->data - rhs_pkt->data);
+  }
+
   using callback_function_type = std::function<void(ert_cmd_state)>;
   std::shared_ptr<kernel_impl> kernel;    // shared ownership
   std::vector<ipctx> ips;                 // ips controlled by this run object
@@ -1366,14 +1547,27 @@ class run_impl
   xrt_core::device* core_device;          // convenience, in scope of kernel
   std::shared_ptr<kernel_command> cmd;    // underlying command object
   uint32_t* data;                         // command argument data payload @0x0
+  uint32_t uid;                           // internal unique id for debug
   std::unique_ptr<arg_setter> arg_setter; // helper to populate payload data
   bool encode_cumasks = false;            // indicate if cmd cumasks must be re-encoded
 
 public:
-  void
-  add_callback(callback_function_type fcn)
+  uint32_t
+  get_uid() const
   {
-    cmd->add_callback(fcn);
+    return uid;
+  }
+
+  void
+  add_callback(callback_function_type&& fcn)
+  {
+    cmd->add_callback(std::move(fcn));
+  }
+
+  void
+  pop_callback()
+  {
+    cmd->pop_callback();
   }
 
   // set_event() - enqueued notifcation of event
@@ -1410,8 +1604,31 @@ public:
     , core_device(kernel->get_core_device())      // cache core device
     , cmd(std::make_shared<kernel_command>(kernel->get_device()))
     , data(kernel->initialize_command(cmd.get())) // default encodes CUs
+    , uid(create_uid())
     , arg_setter(make_arg_setter())
-  {}
+  {
+    XRT_DEBUGF("run_impl::run_impl(%d)\n" , uid);
+  }
+
+  // Clones a run impl, so that the clone can be executed concurrently
+  // with the clonee.
+  run_impl(const run_impl* rhs)
+    : kernel(rhs->kernel)
+    , ips(rhs->ips)
+    , cumask(rhs->cumask)
+    , core_device(rhs->core_device)
+    , cmd(std::make_shared<kernel_command>(kernel->get_device()))
+    , data(clone_command_data(rhs))
+    , uid(create_uid())
+    , arg_setter(make_arg_setter())
+  {
+    XRT_DEBUGF("run_impl::run_impl(%d)\n" , uid);
+  }
+
+  ~run_impl()
+  {
+    XRT_DEBUGF("run_impl::~run_impl(%d)\n" , uid);
+  }
 
   kernel_impl*
   get_kernel() const
@@ -1426,8 +1643,20 @@ public:
     return cmd->get_ert_cmd<ERT_COMMAND_TYPE>();
   }
 
+  const std::bitset<128>&
+  get_cumask() const
+  {
+    return cumask;
+  }
+
+  arg_range<uint8_t>
+  get_arg_value(const argument& arg)
+  {
+    return arg_setter->get_arg_value(arg);
+  }
+
   void
-  set_arg_value(const argument& arg, const arg_range<uint32_t>& value)
+  set_arg_value(const argument& arg, const arg_range<uint8_t>& value)
   {
     arg_setter->set_arg_value(arg, value);
   }
@@ -1435,7 +1664,7 @@ public:
   void
   set_arg_value(const argument& arg, const void* value, size_t bytes)
   {
-    set_arg_value(arg, arg_range<uint32_t>{value, bytes});
+    set_arg_value(arg, arg_range<uint8_t>{value, bytes});
   }
 
   void
@@ -1500,8 +1729,8 @@ public:
     auto pkt = cmd->get_ert_packet();
     pkt->state = ERT_CMD_STATE_NEW;
 
-    //XRT_PRINTF("cmd packet:\n%s\n", debug_cmd_packet(pkt).c_str());
-    
+    XRT_DEBUG_CALL(debug_cmd_packet(kernel->get_name(), pkt));
+
     cmd->run();
   }
 
@@ -1570,7 +1799,7 @@ public:
   }
 
   void
-  update_arg_value(const argument& arg, const arg_range<uint32_t>& value)
+  update_arg_value(const argument& arg, const arg_range<uint8_t>& value)
   {
     reset_cmd();
 
@@ -1601,7 +1830,7 @@ public:
   void
   update_arg_value(const argument& arg, const void* value, size_t bytes)
   {
-    update_arg_value(arg, arg_range<uint32_t>{value, std::min(arg.size(), bytes)});
+    update_arg_value(arg, arg_range<uint8_t>{value, std::min(arg.size(), bytes)});
   }
 
   void
@@ -1716,7 +1945,7 @@ get_device(const xrt::device& xdev)
 //
 // The lifetime of a kernel object is shared ownerhip. The object
 // is shared with host application and run objects.
-static std::shared_ptr<xrt::kernel_impl>
+static const std::shared_ptr<xrt::kernel_impl>&
 get_kernel(xrtKernelHandle khdl)
 {
   auto itr = kernels.find(khdl);
@@ -1782,7 +2011,7 @@ xrtKernelClose(xrtKernelHandle khdl)
 xrtRunHandle
 xrtRunOpen(xrtKernelHandle khdl)
 {
-  auto kernel = get_kernel(khdl);
+  const auto& kernel = get_kernel(khdl);
   auto run = std::make_unique<xrt::run_impl>(kernel);
   auto handle = run.get();
   runs.emplace(std::make_pair(handle,std::move(run)));
@@ -1858,7 +2087,7 @@ copy_bo_with_kdma(const std::shared_ptr<xrt_core::device>& core_device,
   // Construct a kernel command to copy bo.  Kernel commands
   // must be shared ptrs
   auto dev = get_device(core_device);
-  auto cmd = std::make_shared<kernel_command>(dev.get());
+  auto cmd = std::make_shared<kernel_command>(dev);
 
   // Get and fill the underlying packet
   auto pkt = cmd->get_ert_cmd<ert_start_copybo_cmd*>();
@@ -1870,6 +2099,76 @@ copy_bo_with_kdma(const std::shared_ptr<xrt_core::device>& core_device,
 #else
   throw std::runtime_error("KDMA not supported on windows");
 #endif
+}
+
+xrt_core::xclbin::kernel_argument::argtype
+arg_type_at_index(const xrt::kernel& kernel, size_t argidx)
+{
+  auto& arg = kernel.get_handle()->get_arg(argidx);
+  return arg.type();
+}
+
+void
+set_arg_at_index(const xrt::run& run, size_t idx, const void* value, size_t bytes)
+{
+  const auto& rimpl = run.get_handle();
+  auto& arg = rimpl->get_kernel()->get_arg(idx, true);
+  rimpl->set_arg_value(arg, value, bytes);
+}
+
+xrt::run
+clone(const xrt::run& run)
+{
+  return std::make_shared<xrt::run_impl>(run.get_handle().get());
+}
+
+const std::bitset<128>&
+get_cumask(const xrt::run& run)
+{
+  return run.get_handle()->get_cumask();
+}
+
+void
+pop_callback(const xrt::run& run)
+{
+  run.get_handle()->pop_callback();
+}
+
+IP_CONTROL
+get_control_protocol(const xrt::run& run)
+{
+  return run.get_handle()->get_kernel()->get_ip_control_protocol();
+}
+
+  std::vector<const xclbin::kernel_argument*>
+get_args(const xrt::kernel& kernel)
+{
+  const auto& args = kernel.get_handle()->get_args();
+  std::vector<const xclbin::kernel_argument*> vec;
+  for (const auto& arg : args)
+    vec.push_back(&arg.get_xarg());
+  return vec;
+}
+
+const xclbin::kernel_argument*
+get_arg_info(const xrt::run& run, size_t argidx)
+{
+  auto& arg = run.get_handle()->get_kernel()->get_arg(argidx);
+  return &arg.get_xarg();
+}
+
+std::vector<uint32_t>
+get_arg_value(const xrt::run& run, size_t argidx)
+{
+  const auto& rimpl = run.get_handle();
+  const auto kimpl = rimpl->get_kernel();
+
+  // get argument info from kernel and value from run
+  const auto& arg = kimpl->get_arg(argidx);
+  auto value = rimpl->get_arg_value(arg);
+  std::vector<uint32_t> vec(value.size());
+  std::copy_n(value.begin(), value.size(), vec.data());
+  return vec;
 }
 
 }} // kernel_int, xrt_core
@@ -1939,12 +2238,19 @@ update_arg_at_index(int index, const xrt::bo& glb)
 void
 run::
 add_callback(ert_cmd_state state,
-             std::function<void(const run&, ert_cmd_state, void*)> fcn,
+             std::function<void(const void*, ert_cmd_state, void*)> fcn,
              void* data)
 {
+  XRT_DEBUGF("run::add_callback run(%d)\n", handle->get_uid());
   if (state != ERT_CMD_STATE_COMPLETED)
     throw xrt_core::error(-EINVAL, "xrtRunSetCallback state may only be ERT_CMD_STATE_COMPLETED");
-  handle->add_callback([=](ert_cmd_state state) { fcn(*this, state, data); });
+  // The function callback is passed a key that uniquely identifies
+  // run objects referring to the same implmentation.  This allows
+  // upstream to associate key with some run object that represents
+  // the key. Note that the callback cannot pass *this (xrt::run) as
+  // these objects are transient.
+  auto key = handle.get();
+  handle->add_callback([=](ert_cmd_state state) { fcn(key, state, data); });
 }
 
 void
@@ -2064,8 +2370,7 @@ int
 xrtKernelArgGroupId(xrtKernelHandle khdl, int argno)
 {
   try {
-    auto kernel = get_kernel(khdl);
-    return kernel->group_id(argno);
+    return get_kernel(khdl)->group_id(argno);
   }
   catch (const xrt_core::error& ex) {
     xrt_core::send_exception_message(ex.what());
@@ -2081,8 +2386,7 @@ uint32_t
 xrtKernelArgOffset(xrtKernelHandle khdl, int argno)
 {
   try {
-    auto kernel = get_kernel(khdl);
-    return kernel->arg_offset(argno);
+    return get_kernel(khdl)->arg_offset(argno);
   }
   catch (const xrt_core::error& ex) {
     xrt_core::send_exception_message(ex.what());
@@ -2098,8 +2402,7 @@ int
 xrtKernelReadRegister(xrtKernelHandle khdl, uint32_t offset, uint32_t* datap)
 {
   try {
-    auto kernel = get_kernel(khdl);
-    *datap = kernel->read_register(offset);
+    *datap = get_kernel(khdl)->read_register(offset);
     return 0;
   }
   catch (const xrt_core::error& ex) {
@@ -2117,8 +2420,7 @@ int
 xrtKernelWriteRegister(xrtKernelHandle khdl, uint32_t offset, uint32_t data)
 {
   try {
-    auto kernel = get_kernel(khdl);
-    kernel->write_register(offset, data);
+    get_kernel(khdl)->write_register(offset, data);
     return 0;
   }
   catch (const xrt_core::error& ex) {
@@ -2345,6 +2647,6 @@ xrtRunGetArgV(xrtRunHandle rhdl, int index, void* value, size_t bytes)
 void
 xrtRunGetArgVPP(xrt::run run, int index, void* value, size_t bytes)
 {
-  auto rimpl = run.get_handle();
+  const auto& rimpl = run.get_handle();
   rimpl->get_arg_at_index(index, static_cast<uint32_t*>(value), bytes);
 }

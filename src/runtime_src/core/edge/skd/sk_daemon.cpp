@@ -122,10 +122,13 @@ static int waitNextCmd(uint32_t cu_idx)
  * The arguments for soft kernel CU to run is copied into its reg
  * file. By mapping the reg file BO, we get the process's memory
  * address for the soft kernel argemnts.
+ *
+ * Note: since we are reusing reg file BO to store soft kernel
+ * return value, we need to map the BO as writable.
  */
 static void *getKernelArg(unsigned int boHdl, uint32_t cu_idx)
 {
-  return xclMapBO(devHdl, boHdl, false);
+  return xclMapBO(devHdl, boHdl, true);
 }
 
 xclDeviceHandle initXRTHandle(unsigned deviceIndex)
@@ -338,6 +341,9 @@ void configSoftKernel(xclSKCmd *cmd)
      * kernel image.
      */
     pid = fork();
+    if (pid > 0)
+      signal(SIGCHLD,SIG_IGN);
+
     if (pid == 0) {
       char path[XRT_MAX_PATH_LENGTH];
       char proc_name[PNAME_LEN] = {};
@@ -375,9 +381,6 @@ void configSoftKernel(xclSKCmd *cmd)
       syslog(LOG_INFO, "Kernel %s was terminated\n", cmd->krnl_name);
       exit(EXIT_SUCCESS);
     }
-
-    if (pid > 0)
-      signal(SIGCHLD,SIG_IGN);
 
     if (pid < 0)
       syslog(LOG_ERR, "Unable to create soft kernel process( %d)\n", i);

@@ -664,6 +664,11 @@ public:
     return m_computeunits.size();
   }
 
+  // Translate a CU index into a compute_unit object
+  XRT_XOCL_EXPORT
+  const compute_unit*
+  get_compute_unit(unsigned int cuidx) const;
+
   /**
    * Acquire a context for a given compute unit on this device.
    *

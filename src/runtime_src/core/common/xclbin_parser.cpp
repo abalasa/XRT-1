@@ -621,13 +621,16 @@ get_kernel_arguments(const char* xml_data, size_t xml_size, const std::string& k
          ,index
          ,convert(xml_arg.second.get<std::string>("<xmlattr>.offset"))
          ,convert(xml_arg.second.get<std::string>("<xmlattr>.size"))
+         ,convert(xml_arg.second.get<std::string>("<xmlattr>.hostSize"))
          ,0  // fa_desc_offset post computed if necessary
          ,kernel_argument::argtype(xml_arg.second.get<size_t>("<xmlattr>.addressQualifier"))
          ,kernel_argument::direction(kernel_argument::direction::input)
       });
     }
 
-    std::sort(args.begin(), args.end(), [](auto& a1, auto& a2) { return a1.index < a2.index; });
+    // stable sort to preserve order of multi-component arguments
+    // for example global_size, local_size, etc.
+    std::stable_sort(args.begin(), args.end(), [](auto& a1, auto& a2) { return a1.index < a2.index; });
     break;
   }
   return args;

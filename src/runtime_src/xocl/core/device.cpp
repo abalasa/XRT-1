@@ -304,7 +304,7 @@ get_stream(xrt_xocl::device::stream_flags flags, xrt_xocl::device::stream_attrs 
   if(ext && ext->param) {
     auto kernel = xocl::xocl(ext->kernel);
 
-    auto& kernel_name = kernel->get_name_from_constructor();
+    auto& kernel_name = kernel->get_name();
     auto memidx = m_metadata.get_memidx_from_arg(kernel_name,ext->flags,conn);
     auto mems = m_metadata.get_mem_topology();
 
@@ -1088,6 +1088,16 @@ unload_program(const program* program)
     if (!m_parent.get())
       m_xdevice->release_cu_context(-1); // release virtual CU context
   }
+}
+
+const compute_unit*
+device::
+get_compute_unit(unsigned int cuidx) const
+{
+  for (auto cu : m_computeunits)
+    if (cu->get_index() == cuidx)
+      return cu.get();
+  return nullptr;
 }
 
 bool

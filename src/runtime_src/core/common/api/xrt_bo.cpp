@@ -33,14 +33,23 @@
 #include "core/common/unistd.h"
 #include "core/common/xclbin_parser.h"
 
+#include <cstdlib>
 #include <map>
 #include <set>
 
 #ifdef _WIN32
-# pragma warning( disable : 4244 4100)
+# pragma warning( disable : 4244 4100 4996 )
 #endif
 
 namespace {
+
+static bool
+is_noop_emulation()
+{
+  static auto xem = std::getenv("XCL_EMULATION_MODE");
+  static bool noop = xem ? (std::strcmp(xem,"noop")==0) : false;
+  return noop;
+}
 
 static bool
 is_nodma(xclDeviceHandle xhdl)
@@ -111,11 +120,14 @@ public:
 private:
   void
   get_bo_properties() const
-  { 
+  {
     xclBOProperties prop;
     device->get_bo_properties(handle, &prop);
     addr = prop.paddr;
-    //grpid = prop.flags & XRT_BO_FLAGS_MEMIDX_MASK;
+    grpid = prop.flags & XRT_BO_FLAGS_MEMIDX_MASK;
+
+    if (is_noop_emulation())
+      return;
 
     // Remove when driver returns the flags that were used to ctor the bo
     auto mem_topo = device->get_axlf_section<const ::mem_topology*>(ASK_GROUP_TOPOLOGY);
@@ -282,7 +294,7 @@ public:
   {
     if (addr == no_addr)
       get_bo_properties();
-    
+
     return addr;
   }
 
@@ -404,7 +416,7 @@ public:
   {
     return bo_impl::no_group;
   }
-  
+
 };
 
 // class buffer_dbuf - device only buffer
@@ -513,7 +525,7 @@ namespace {
 // deleted if no other shared ptrs exists for this buffer
 static std::map<xrtBufferHandle, std::shared_ptr<xrt::bo_impl>> bo_cache;
 
-static std::shared_ptr<xrt::bo_impl>
+static const std::shared_ptr<xrt::bo_impl>&
 get_boh(xrtBufferHandle bhdl)
 {
   auto itr = bo_cache.find(bhdl);
@@ -658,22 +670,19 @@ namespace xrt_core { namespace bo {
 uint64_t
 address(const xrt::bo& bo)
 {
-  auto boh = bo.get_handle();
-  return boh->get_address();
+  return bo.get_handle()->get_address();
 }
 
 uint64_t
 address(xrtBufferHandle handle)
 {
-  auto boh = get_boh(handle);
-  return boh->get_address();
+  return get_boh(handle)->get_address();
 }
 
 int32_t
 group_id(const xrt::bo& bo)
 {
-  auto boh = bo.get_handle();
-  return boh->get_group_id();
+  return bo.get_handle()->get_group_id();
 }
 
 void
@@ -681,8 +690,8 @@ fill_copy_pkt(const xrt::bo& dst, const xrt::bo& src, size_t sz,
               size_t dst_offset, size_t src_offset, ert_start_copybo_cmd* pkt)
 {
 #ifndef _WIN32
-  auto dst_boh = dst.get_handle();
-  auto src_boh = src.get_handle();
+  const auto& dst_boh = dst.get_handle();
+  const auto& src_boh = src.get_handle();
   ert_fill_copybo_cmd(pkt, src_boh->get_xcl_handle(), dst_boh->get_xcl_handle(), src_offset, dst_offset, sz);
 #else
   throw std::runtime_error("ert_fill_copybo_cmd not implemented on windows");
@@ -692,7 +701,7 @@ fill_copy_pkt(const xrt::bo& dst, const xrt::bo& src, size_t sz,
 bool
 is_imported(const xrt::bo& bo)
 {
-  auto boh = bo.get_handle();
+  const auto& boh = bo.get_handle();
   return boh->is_imported();
 }
 
@@ -797,8 +806,7 @@ void
 bo::
 sync(const std::string& port, xclBOSyncDirection dir, size_t sz, size_t offset)
 {
-  auto handle = get_handle();
-
+  const auto& handle = get_handle();
   handle->sync(*this, port, dir, sz, offset);
 }
 
@@ -850,7 +858,7 @@ xrtBufferHandle
 xrtBOSubAlloc(xrtBufferHandle phdl, size_t sz, size_t offset)
 {
   try {
-    auto parent = get_boh(phdl);
+    const auto& parent = get_boh(phdl);
     auto boh = sub_buffer(parent, sz, offset);
     bo_cache[boh.get()] = boh;
     return boh.get();
@@ -890,8 +898,7 @@ xclBufferExportHandle
 xrtBOExport(xrtBufferHandle bhdl)
 {
   try {
-    auto boh = get_boh(bhdl);
-    return boh->export_buffer();
+    return get_boh(bhdl)->export_buffer();
   }
   catch (const xrt_core::error& ex) {
     xrt_core::send_exception_message(ex.what());
@@ -925,8 +932,7 @@ size_t
 xrtBOSize(xrtBufferHandle bhdl)
 {
   try {
-    auto boh = get_boh(bhdl);
-    return boh->get_size();
+    return get_boh(bhdl)->get_size();
   }
   catch (const xrt_core::error& ex) {
     xrt_core::send_exception_message(ex.what());
@@ -944,8 +950,7 @@ int
 xrtBOSync(xrtBufferHandle bhdl, xclBOSyncDirection dir, size_t size, size_t offset)
 {
   try {
-    auto boh = get_boh(bhdl);
-    boh->sync(dir, size, offset);
+    get_boh(bhdl)->sync(dir, size, offset);
     return 0;
   }
   catch (const xrt_core::error& ex) {
@@ -962,8 +967,7 @@ void*
 xrtBOMap(xrtBufferHandle bhdl)
 {
   try {
-    auto boh = get_boh(bhdl);
-    return boh->get_hbuf();
+    return get_boh(bhdl)->get_hbuf();
   }
   catch (const xrt_core::error& ex) {
     xrt_core::send_exception_message(ex.what());
@@ -980,8 +984,7 @@ int
 xrtBOWrite(xrtBufferHandle bhdl, const void* src, size_t size, size_t seek)
 {
   try {
-    auto boh = get_boh(bhdl);
-    boh->write(src, size, seek);
+    get_boh(bhdl)->write(src, size, seek);
     return 0;
   }
   catch (const xrt_core::error& ex) {
@@ -998,8 +1001,7 @@ int
 xrtBORead(xrtBufferHandle bhdl, void* dst, size_t size, size_t skip)
 {
   try {
-    auto boh = get_boh(bhdl);
-    boh->read(dst, size, skip);
+    get_boh(bhdl)->read(dst, size, skip);
     return 0;
   }
   catch (const xrt_core::error& ex) {
@@ -1016,8 +1018,8 @@ int
 xrtBOCopy(xrtBufferHandle dhdl, xrtBufferHandle shdl, size_t sz, size_t dst_offset, size_t src_offset)
 {
   try {
-    auto dst = get_boh(dhdl);
-    auto src = get_boh(shdl);
+    const auto& dst = get_boh(dhdl);
+    const auto& src = get_boh(shdl);
     dst->copy(src.get(), sz, src_offset, dst_offset);
     return 0;
   }
@@ -1036,8 +1038,7 @@ uint64_t
 xrtBOAddress(xrtBufferHandle bhdl)
 {
   try {
-    auto boh = get_boh(bhdl);
-    return boh->get_address();
+    return get_boh(bhdl)->get_address();
   }
   catch (const xrt_core::error& ex) {
     xrt_core::send_exception_message(ex.what());

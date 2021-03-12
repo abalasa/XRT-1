@@ -72,6 +72,7 @@ MODULE_PARM_DESC(xrt_reset_syncup,
 static void xocl_mb_connect(struct xocl_dev *xdev);
 static void xocl_mailbox_srv(void *arg, void *data, size_t len,
 	u64 msgid, int err, bool sw_ch);
+static int identify_bar(struct xocl_dev *xdev);
 
 static void set_mig_cache_data(struct xocl_dev *xdev, struct xcl_mig_ecc *mig_ecc)
 {
@@ -137,7 +138,7 @@ static void xocl_mig_cache_read_from_peer(struct xocl_dev *xdev)
 	memcpy(mb_req->data, &subdev_peer, data_len);
 
 	ret = xocl_peer_request(xdev,
-		mb_req, reqlen, mig_ecc, &resp_len, NULL, NULL, 0);
+		mb_req, reqlen, mig_ecc, &resp_len, NULL, NULL, 0, 0);
 
 	if (!ret)
 		set_mig_cache_data(xdev, mig_ecc);
@@ -313,7 +314,7 @@ int xocl_program_shell(struct xocl_dev *xdev, bool force)
 
 	userpf_info(xdev, "request mgmtpf to program prp");
 	mbret = xocl_peer_request(xdev, &mbreq, sizeof(struct xcl_mailbox_req),
-		&ret, &resplen, NULL, NULL, 0);
+		&ret, &resplen, NULL, NULL, 0, 0);
 	if (mbret)
 		ret = mbret;
 	if (ret) {
@@ -364,14 +365,14 @@ int xocl_hot_reset(struct xocl_dev *xdev, u32 flag)
 			return 0;
 
 		xocl_peer_request(xdev, &mbreq, sizeof(struct xcl_mailbox_req),
-			&ret, &resplen, NULL, NULL, 0);
+			&ret, &resplen, NULL, NULL, 0, 6);
 		/* userpf will back online till receiving mgmtpf notification */
 
 		return 0;
 	}
 
 	mbret = xocl_peer_request(xdev, &mbreq, sizeof(struct xcl_mailbox_req),
-		&ret, &resplen, NULL, NULL, 0);
+		&ret, &resplen, NULL, NULL, 0, 0);
 
 	xocl_reset_notify(xdev->core.pdev, true);
 
@@ -566,7 +567,7 @@ static void xocl_mb_connect(struct xocl_dev *xdev)
 	mb_conn->version = XCL_MB_PROTOCOL_VER;
 
 	ret = xocl_peer_request(xdev, mb_req, reqlen, resp, &resplen,
-		NULL, NULL, 0);
+		NULL, NULL, 0, 0);
 	(void) xocl_mailbox_set(xdev, CHAN_STATE, resp->conn_flags);
 	(void) xocl_mailbox_set(xdev, CHAN_SWITCH, resp->chan_switch);
 	(void) xocl_mailbox_set(xdev, COMM_ID, (u64)(uintptr_t)resp->comm_id);
@@ -627,7 +628,7 @@ int xocl_reclock(struct xocl_dev *xdev, void *data)
 
 	if (err == 0) {
 		err = xocl_peer_request(xdev, req, reqlen,
-			&msg, &resplen, NULL, NULL, 0);
+			&msg, &resplen, NULL, NULL, 0, 0);
 		if (err == 0)
 			err = msg;
 	}
@@ -814,7 +815,7 @@ int xocl_refresh_subdevs(struct xocl_dev *xdev)
 
 		subdev_peer.offset = offset;
 		ret = xocl_peer_request(xdev, mb_req, reqlen,
-			resp, &resp_len, NULL, NULL, 0);
+			resp, &resp_len, NULL, NULL, 0, 0);
 		if (ret)
 			goto failed;
 
@@ -873,11 +874,19 @@ int xocl_refresh_subdevs(struct xocl_dev *xdev)
 
 	xocl_subdev_offline_all(xdev);
 	xocl_subdev_destroy_all(xdev);
+
+	ret = identify_bar(xdev);
+	if (ret) {
+		userpf_err(xdev, "failed to identify bar");
+		goto failed;
+	}
+
 	ret = xocl_subdev_create_all(xdev);
 	if (ret) {
 		userpf_err(xdev, "create subdev failed %d", ret);
 		goto failed;
 	}
+
 	ret = xocl_p2p_init(xdev);
 	if (ret) {
 		userpf_err(xdev, "failed to init p2p memory");
@@ -942,7 +951,10 @@ int xocl_p2p_init(struct xocl_dev *xdev)
 	return 0;
 }
 
-static int identify_bar(struct xocl_dev *xdev)
+/*
+ * Legacy platform uses bar_len to identify user bar.
+ */
+static int identify_bar_legacy(struct xocl_dev *xdev)
 {
 	struct pci_dev *pdev = xdev->core.pdev;
 	resource_size_t bar_len;
@@ -964,12 +976,53 @@ static int identify_bar(struct xocl_dev *xdev)
 	return 0;
 }
 
+/*
+ * For data driven platform, ep_mailbox_user_00 indicates user bar.
+ * Remap the user bar based on bar id from device tree medadata (dts).
+ */
+static int identify_bar_by_dts(struct xocl_dev *xdev)
+{
+	struct pci_dev *pdev = xdev->core.pdev;
+	int ret;
+	int bar_id;
+	int i;
+	resource_size_t bar_len;
+
+	BUG_ON(!XOCL_DEV_HAS_DEVICE_TREE(xdev));
+
+	ret = xocl_subdev_get_baridx(xdev, NODE_MAILBOX_USER, IORESOURCE_MEM,
+		&bar_id);
+	if (ret)
+		return ret;
+
+	bar_len = pci_resource_len(pdev, bar_id);
+
+	xdev->core.bar_addr = ioremap_nocache(
+		pci_resource_start(pdev, bar_id), bar_len);
+	if (!xdev->core.bar_addr)
+		return -EIO;
+
+	xdev->core.bar_idx = bar_id;
+	xdev->core.bar_size = bar_len;
+
+	xocl_xdev_info(xdev, "user bar:%d size: %lld", bar_id, bar_len);
+	return 0;
+}
+
 static void unmap_bar(struct xocl_dev *xdev)
 {
 	if (xdev->core.bar_addr) {
 		iounmap(xdev->core.bar_addr);
 		xdev->core.bar_addr = NULL;
 	}
+}
+
+static int identify_bar(struct xocl_dev *xdev)
+{
+	unmap_bar(xdev);
+	return XOCL_DEV_HAS_DEVICE_TREE(xdev) ?
+		identify_bar_by_dts(xdev) :
+		identify_bar_legacy(xdev);
 }
 
 void xocl_userpf_remove(struct pci_dev *pdev)
@@ -1055,9 +1108,11 @@ static void xocl_cma_mem_free(struct xocl_dev *xdev, uint32_t idx)
 		cma_mem->sgt = NULL;
 	}
 
-	if (cma_mem->vaddr) {
-		dma_free_coherent(&xdev->core.pdev->dev, cma_mem->size, cma_mem->vaddr, cma_mem->paddr);
-		cma_mem->vaddr = NULL;
+	if (cma_mem->regular_page) {
+		dma_unmap_page(&xdev->core.pdev->dev, cma_mem->paddr,
+			cma_mem->size, PCI_DMA_BIDIRECTIONAL);
+		__free_pages(cma_mem->regular_page, get_order(cma_mem->size));
+		cma_mem->regular_page = NULL;
 	} else if (cma_mem->pages) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
 		release_pages(cma_mem->pages, cma_mem->size >> PAGE_SHIFT);
@@ -1259,8 +1314,7 @@ done:
 	return ret;
 }
 
-static struct page **xocl_virt_addr_get_pages(void *vaddr, int npages)
-
+static struct page **xocl_phy_addr_get_pages(uint64_t paddr, int npages)
 {
 	struct page *p, **pages;
 	int i;
@@ -1271,7 +1325,7 @@ static struct page **xocl_virt_addr_get_pages(void *vaddr, int npages)
 		return ERR_PTR(-ENOMEM);
 
 	for (i = 0; i < npages; i++) {
-		p = virt_to_page(vaddr + offset);
+		p = pfn_to_page(PHYS_PFN(paddr + offset));
 		pages[i] = p;
 		if (IS_ERR(p))
 			goto fail;
@@ -1286,37 +1340,46 @@ fail:
 
 static int xocl_cma_mem_alloc_by_idx(struct xocl_dev *xdev, uint64_t size, uint32_t idx)
 {
-	int ret = 0;
-	uint64_t page_count;
+	struct device *dev = &xdev->core.pdev->dev;
 	struct xocl_cma_memory *cma_mem = &xdev->cma_bank->cma_mem[idx];
-	struct page **pages = NULL;
+	int order = get_order(size);
+	struct page *page;
 	dma_addr_t dma_addr;
+	int node = dev_to_node(dev);
 
-	page_count = (size) >> PAGE_SHIFT;
+	page = alloc_pages_node(node, GFP_HIGHUSER, order);
+	if (unlikely(!page))
+		DRM_ERROR("Unable to alloc numa pages, %d", order);
+	if (!page)
+		page = alloc_pages(GFP_HIGHUSER, order);
 
-	cma_mem->vaddr = dma_alloc_coherent(&xdev->core.pdev->dev, size, &dma_addr, GFP_KERNEL);
-
-	if (!cma_mem->vaddr) {
-		DRM_ERROR("Unable to alloc %llx bytes CMA buffer", size);
-		ret = -ENOMEM;
-		goto done;
+	if (unlikely(!page)) {
+		DRM_ERROR("Unable to alloc pages, %d", order);
+		return -ENOMEM;
 	}
 
-	pages = xocl_virt_addr_get_pages(cma_mem->vaddr, size >> PAGE_SHIFT);
-	if (IS_ERR(pages)) {
-		ret = PTR_ERR(pages);
-		goto done;
+	dma_addr = dma_map_page(dev, page, 0, size,
+		PCI_DMA_BIDIRECTIONAL);
+	if (unlikely(dma_mapping_error(dev, dma_addr))) {
+		DRM_ERROR("Unable to dma map pages");
+		__free_pages(page, order);
+		return -EFAULT;
 	}
 
-	cma_mem->pages = pages;
+	cma_mem->pages = xocl_phy_addr_get_pages(PFN_PHYS(page_to_pfn(page)),
+		roundup(PAGE_SIZE, size) >> PAGE_SHIFT);
+
+	if (!cma_mem->pages) {
+		dma_unmap_page(dev, dma_addr, size, PCI_DMA_BIDIRECTIONAL);
+		__free_pages(page, order);
+		return -ENOMEM;
+	}
+
+	cma_mem->regular_page = page;
 	cma_mem->paddr = dma_addr;
 	cma_mem->size = size;
 
-done:
-	if (ret)
-		xocl_cma_mem_free(xdev, idx);
-
-	return ret;
+	return 0;
 }
 
 static void __xocl_cma_bank_free(struct xocl_dev *xdev)
@@ -1333,7 +1396,8 @@ static void __xocl_cma_bank_free(struct xocl_dev *xdev)
 static int xocl_cma_mem_alloc(struct xocl_dev *xdev, uint64_t size)
 {
 	int ret = 0;
-	uint64_t i = 0, page_sz;
+	uint64_t page_sz;
+	int64_t i = 0;
 	uint64_t page_num = xocl_addr_translator_get_entries_num(xdev);
 	uint64_t *phys_addrs = NULL, cma_mem_size = 0;
 
@@ -1357,10 +1421,11 @@ static int xocl_cma_mem_alloc(struct xocl_dev *xdev, uint64_t size)
 	for (; i < page_num; ++i) {
 		ret = xocl_cma_mem_alloc_by_idx(xdev, page_sz, i);
 		if (ret) {
-			ret = -ENOMEM;
+			xdev->cma_bank->entry_num = i;
 			goto done;
 		}
 	}
+	xdev->cma_bank->entry_num = page_num;
 
 	phys_addrs = vzalloc(page_num*sizeof(uint64_t));
 	if (!phys_addrs) {
@@ -1392,12 +1457,12 @@ static int xocl_cma_mem_alloc(struct xocl_dev *xdev, uint64_t size)
 	if (ret)
 		goto done;
 
-	xdev->cma_bank->entry_num = page_num;
 	xdev->cma_bank->entry_sz = page_sz;
 
 	ret = xocl_addr_translator_set_page_table(xdev, phys_addrs, page_sz, page_num);
 done:	
 	vfree(phys_addrs);
+
 	return ret;
 }
 
@@ -1494,6 +1559,11 @@ int xocl_userpf_probe(struct pci_dev *pdev,
 		goto failed;
 
 	xocl_fill_dsa_priv(xdev, (struct xocl_board_private *)ent->driver_data);
+
+	if (xocl_subdev_is_vsec_recovery(xdev)) {
+		xocl_err(&pdev->dev, "recovery image, return");
+		return 0;
+	}
 
 	for (i = XOCL_WORK_RESET; i < XOCL_WORK_NUM; i++) {
 		INIT_DELAYED_WORK(&xdev->core.works[i].work, xocl_work_cb);
@@ -1665,6 +1735,7 @@ static int (*xocl_drv_reg_funcs[])(void) __initdata = {
 	xocl_init_msix_xdma,
 	xocl_init_ert_user,
 	xocl_init_ert_30,
+	xocl_init_ert_versal,
 	xocl_init_m2m,
 };
 
@@ -1702,6 +1773,7 @@ static void (*xocl_drv_unreg_funcs[])(void) = {
 	xocl_fini_msix_xdma,
 	xocl_fini_ert_user,
 	xocl_fini_ert_30,
+	xocl_fini_ert_versal,
 	xocl_fini_m2m,
 	/* Remove intc sub-device after CU/ERT sub-devices */
 	xocl_fini_intc,

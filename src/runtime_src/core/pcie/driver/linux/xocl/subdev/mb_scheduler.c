@@ -2223,18 +2223,16 @@ exec_stop(struct exec_core *exec)
 }
 
 static irqreturn_t
-versal_isr(int irq, void *arg)
+versal_isr(void *arg)
 {
 	struct exec_core *exec = (struct exec_core *)arg;
 	SCHED_DEBUGF("-> %s %d\n", __func__, irq);
 
 	if (exec) {
-		xocl_mailbox_versal_handle_intr(exec_get_xdev(exec));
-
 		if (!exec->polling_mode)
 			scheduler_intr(exec->scheduler);
 		else
-			userpf_err(exec_get_xdev(exec), "unhandled isr irq %d", irq);
+			userpf_err(exec_get_xdev(exec), "unhandled %s", __func__);
 	}
 
 	SCHED_DEBUGF("<- %s\n", __func__);
@@ -2247,14 +2245,6 @@ exec_isr(int irq, void *arg)
 	struct exec_core *exec = (struct exec_core *)arg;
 
 	SCHED_DEBUGF("-> xocl_user_event %d\n", irq);
-
-	/*
-	 * versal_isr is registered here,
-	 * but versal interrupt is enabled by mailbox_versal subdev.
-	 * Note: should be separated from exec_isr in new scheduler.
-	 */
-	if (exec && XOCL_DSA_IS_VERSAL(exec_get_xdev(exec)))
-		return versal_isr(irq, arg);
 
 	if (exec && !exec->polling_mode) {
 
@@ -2350,10 +2340,14 @@ exec_create(struct platform_device *pdev, struct xocl_scheduler *xs)
 	exec->uid = count++;
 
 	if (!kds_mode) {
-		for (i = 0; i < exec->intr_num; i++) {
-			xocl_user_interrupt_reg(xdev, i+exec->intr_base, exec_isr, exec);
-			xocl_user_interrupt_config(xdev, i + exec->intr_base, true);
-		}
+		if (XOCL_DSA_IS_VERSAL(xdev)) {
+			xocl_mailbox_versal_request_intr(xdev, versal_isr, exec);
+		} else {
+			for (i = 0; i < exec->intr_num; i++) {
+				xocl_user_interrupt_reg(xdev, i+exec->intr_base, exec_isr, exec);
+				xocl_user_interrupt_config(xdev, i + exec->intr_base, true);
+			}
+		}	
 	}
 
 	exec_reset(exec, &uuid_null);
@@ -4294,11 +4288,15 @@ static int config_scu(struct platform_device *pdev,
 	for (i = scmd->start_cuidx; i < scmd->start_cuidx + scmd->num_cus;
 	    i++) {
 		if (scmd->opcode == ERT_SK_CONFIG) {
+			char scu_name[32];
 			if (strlen(xert->scu_name[i]) > 0)
 				continue;
 			exec->num_sk_cus++;
-			strncpy(xert->scu_name[i], (char *)scmd->sk_name,
-				sizeof(xert->scu_name[0]) - 1);
+			/* Add "scu_idx#" suffix to identify softkernel */
+			strncpy(scu_name, (char *)scmd->sk_name,
+				sizeof(xert->scu_name[0]) - 8);
+			snprintf(xert->scu_name[i], 32, "%s:scu_%d",
+				scu_name, i);
 		} else {
 			if (strlen(xert->scu_name[i]) == 0)
 				continue;
@@ -4851,6 +4849,7 @@ kds_custat_show(struct device *dev, struct device_attribute *attr, char *buf)
 	struct xocl_ert *xert = exec_is_ert(exec) ? exec->ert : NULL;
 	unsigned int idx = 0;
 	ssize_t sz = 0;
+	int32_t cu_status = -1;
 
 	// No need to lock exec, cu stats are computed and cached.
 	// Even if xclbin is swapped, the data reflects the xclbin on
@@ -4865,9 +4864,12 @@ kds_custat_show(struct device *dev, struct device_attribute *attr, char *buf)
 	if (xert) {
 		/* soft kernel CUs */
 		for (;idx < (exec->num_cus + exec->num_sk_cus); ++idx) {
+			cu_status = ert_cu_status(xert, idx);
+			if (!cu_status)
+				cu_status = AP_IDLE;
 			sz += sprintf(buf+sz, "CU[@0x0] : %d status : %d name : %s\n",
 				      ert_cu_usage(xert, idx),
-				      ert_cu_status(xert, idx) ? AP_START : AP_IDLE,
+				      cu_status,
 				      xert->scu_name[idx - exec->num_cus]);
 		}
 	}
@@ -4900,7 +4902,10 @@ kds_custat_show(struct device *dev, struct device_attribute *attr, char *buf)
 	for (idx = 0; idx < exec->num_cus + exec->num_sk_cus; ++idx) {
 		if (idx > 0)
 			sz += sprintf(buf+sz, ",");
-		sz += sprintf(buf+sz, "%d", ert_cu_status(xert, idx));
+		cu_status = ert_cu_status(xert, idx);
+		if (!cu_status)
+			cu_status = AP_IDLE;
+		sz += sprintf(buf+sz, "%d", cu_status);
 	}
 
 	sz += sprintf(buf+sz, "}\nERT scheduler CQ state : {");
@@ -4997,10 +5002,15 @@ static int mb_scheduler_remove(struct platform_device *pdev)
 	destroy_workqueue(exec->completion_wq);
 
 	if (!kds_mode) {
-		for (i = 0; i < exec->intr_num; i++) {
-			xocl_user_interrupt_config(xdev, i + exec->intr_base, false);
-			xocl_user_interrupt_reg(xdev, i + exec->intr_base, NULL, NULL);
+		if (XOCL_DSA_IS_VERSAL(xdev)) {
+			xocl_mailbox_versal_free_intr(xdev);
+		} else {
+			for (i = 0; i < exec->intr_num; i++) {
+				xocl_user_interrupt_config(xdev, i + exec->intr_base, false);
+				xocl_user_interrupt_reg(xdev, i + exec->intr_base, NULL, NULL);
+			}
 		}
+
 	}
 	mutex_destroy(&exec->exec_lock);
 
