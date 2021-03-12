@@ -10,7 +10,7 @@ jobs:
   build_lnx_matrix:
     strategy:
       matrix:
-        os: [centos74, centos8, al2]
+        os: [centos74, centos8, al2, ubuntu2004]
     runs-on: self-hosted-docker-${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
@@ -24,9 +24,14 @@ jobs:
         cd build && chmod +x build.sh && scl enable devtoolset-9 -- bash -c ./build.sh
       shell: bash
     - name: XRT Build
-      if: ${{ matrix.os == 'centos8' || matrix.os == 'ubuntu2004' || matrix.os == 'al2' }}
+      if: ${{ matrix.os == 'centos8' }}
       run: |
         source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+        cd build && chmod +x build.sh && ./build.sh
+      shell: bash
+    - name: XRT Build
+      if: ${{ matrix.os == 'ubuntu2004' || matrix.os == 'al2' }}
+      run: |
         cd build && chmod +x build.sh && ./build.sh
       shell: bash
     - name: Stash files Centos
@@ -45,8 +50,8 @@ jobs:
       if: ${{ always() }}
       run: |
         echo "Cleaning up previous run"
-        rm -rf "$GITHUB_WORKSPACE/Debug" 
-        rm -rf "$GITHUB_WORKSPACE/Release"
+        rm -rf "$GITHUB_WORKSPACE/build/Debug" 
+        rm -rf "$GITHUB_WORKSPACE/build/Release"
       shell: bash
   
   uninstall_lnx_xrt:
