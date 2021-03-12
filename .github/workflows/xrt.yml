@@ -55,7 +55,8 @@ jobs:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   
-  build_win:
+
+  build_win_matrix:
     strategy:
       matrix:
         os: [windows10]      
