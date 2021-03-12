@@ -41,11 +41,6 @@ jobs:
       with:
         name: xrt-deb-${{ matrix.os }}
         path: build/Release/xrt_*-xrt.deb
-    - name: Runner workspace path
-      run: |
-        echo "Cleaning up previous run"
-        rm -rf "${{ github.workspace }}"
-      shell: bash
     - name: Cleanup workspace Release and Debug dirs
       if: ${{ always() }}
       run: |
