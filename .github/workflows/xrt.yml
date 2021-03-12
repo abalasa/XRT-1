@@ -41,6 +41,11 @@ jobs:
       with:
         name: xrt-deb-${{ matrix.os }}
         path: build/Release/xrt_*-xrt.deb
+    - name: Runner workspace path
+      run: |
+        echo "Cleaning up previous run"
+        rm -rf "${{ github.workspace }}"
+      shell: bash
   
   uninstall_lnx_xrt:
     strategy:
@@ -50,7 +55,6 @@ jobs:
     steps:
       - name: Uninstall xrt rpms
         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
-  
 
   build_win_matrix:
     strategy:
