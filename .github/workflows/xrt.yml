@@ -7,52 +7,52 @@ on:
     branches: [ master ]
 
 jobs:
-  build_lnx_matrix:
-    strategy:
-      matrix:
-        os: [al2, ubuntu2004, centos8]
-    runs-on: self-hosted-docker-${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: |
-        sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
-    - name: XRT Centos74 Build
-      if: ${{ matrix.os == 'centos74' }}
-      run: |
-        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
-        cd build && chmod +x build.sh && scl enable devtoolset-9 -- bash -c ./build.sh
-      shell: bash
-    - name: XRT Build
-      if: ${{ matrix.os == 'centos8' }}
-      run: |
-        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
-        cd build && chmod +x build.sh && ./build.sh
-      shell: bash
-    - name: XRT Build
-      if: ${{ matrix.os == 'ubuntu2004' || matrix.os == 'al2' }}
-      run: |
-        cd build && chmod +x build.sh && ./build.sh
-      shell: bash
-    - name: Stash files Centos
-      if: ${{ matrix.os == 'centos74' || matrix.os == 'centos8' || matrix.os == 'al2'}}
-      uses: actions/upload-artifact@v2
-      with:
-        name: xrt-rpm-${{ matrix.os }}
-        path: build/Release/xrt_*-xrt.rpm
-    - name: Stash files Ubuntu
-      if: ${{ matrix.os == 'ubuntu2004' }}
-      uses: actions/upload-artifact@v2
-      with:
-        name: xrt-deb-${{ matrix.os }}
-        path: build/Release/xrt_*-xrt.deb
-    - name: Runner workspace path
-      if: ${{ always() }}
-      run: |
-        echo "Cleaning up previous run"
-        rm -rf "$GITHUB_WORKSPACE/build/Debug" 
-        rm -rf "$GITHUB_WORKSPACE/build/Release"
-      shell: bash
+#   build_lnx_matrix:
+#     strategy:
+#       matrix:
+#         os: [al2, ubuntu2004, centos8]
+#     runs-on: self-hosted-docker-${{ matrix.os }}
+#     steps:
+#     - uses: actions/checkout@v2
+#     - name: Install dependencies
+#       run: |
+#         sudo src/runtime_src/tools/scripts/xrtdeps.sh -docker
+#     - name: XRT Centos74 Build
+#       if: ${{ matrix.os == 'centos74' }}
+#       run: |
+#         source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+#         cd build && chmod +x build.sh && scl enable devtoolset-9 -- bash -c ./build.sh
+#       shell: bash
+#     - name: XRT Build
+#       if: ${{ matrix.os == 'centos8' }}
+#       run: |
+#         source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+#         cd build && chmod +x build.sh && ./build.sh
+#       shell: bash
+#     - name: XRT Build
+#       if: ${{ matrix.os == 'ubuntu2004' || matrix.os == 'al2' }}
+#       run: |
+#         cd build && chmod +x build.sh && ./build.sh
+#       shell: bash
+#     - name: Stash files Centos
+#       if: ${{ matrix.os == 'centos74' || matrix.os == 'centos8' || matrix.os == 'al2'}}
+#       uses: actions/upload-artifact@v2
+#       with:
+#         name: xrt-rpm-${{ matrix.os }}
+#         path: build/Release/xrt_*-xrt.rpm
+#     - name: Stash files Ubuntu
+#       if: ${{ matrix.os == 'ubuntu2004' }}
+#       uses: actions/upload-artifact@v2
+#       with:
+#         name: xrt-deb-${{ matrix.os }}
+#         path: build/Release/xrt_*-xrt.deb
+#     - name: Runner workspace path
+#       if: ${{ always() }}
+#       run: |
+#         echo "Cleaning up previous run"
+#         rm -rf "$GITHUB_WORKSPACE/build/Debug" 
+#         rm -rf "$GITHUB_WORKSPACE/build/Release"
+#       shell: bash
 
 #   build_xrt_edge:
 #     strategy:
@@ -81,23 +81,23 @@ jobs:
 #       - name: Uninstall xrt rpms
 #         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   
-#   build_win_matrix:
-#     strategy:
-#       matrix:
-#         os: [windows10]      
-#     runs-on: self-hosted-${{ matrix.os }}
-#     steps:
-#       - name: XRT Windows Build
-#         run: >-
-#           call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
-#           cd build &
-#           build.bat -release
-#         shell: cmd
-#       - name: Stash files Win10
-#         uses: actions/upload-artifact@v2
-#         with:
-#          name: xrt-exe-${{ matrix.os }}
-#          path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
+  build_win_matrix:
+    strategy:
+      matrix:
+        os: [windows10]      
+    runs-on: self-hosted-${{ matrix.os }}
+    steps:
+      - name: XRT Windows Build
+        run: >-
+          call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
+          cd build &
+          build.bat -release
+        shell: cmd
+      - name: Stash files Win10
+        uses: actions/upload-artifact@v2
+        with:
+         name: xrt-exe-${{ matrix.os }}
+         path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
   
 #   board_reset:
 #     runs-on: self-hosted-bf-runner
