@@ -87,6 +87,7 @@ jobs:
         os: [windows10]      
     runs-on: self-hosted-${{ matrix.os }}
     steps:
+      - uses: actions/checkout@v2
       - name: XRT Windows Build
         run: >-
           call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
