@@ -69,11 +69,6 @@ jobs:
         os: [windows10]      
     runs-on: self-hosted-${{ matrix.os }}
     steps:
-      - name: Runner workspace path
-        run: >-
-          echo "Cleaning up previous run" &
-          @RD /S /Q "${{ github.workspace }}"
-        shell: cmd
       - uses: actions/checkout@v2
       - name: XRT Windows Build
         run: >-
