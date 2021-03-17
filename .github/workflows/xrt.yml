@@ -79,7 +79,7 @@ jobs:
     steps:
       - name: Test platform matrix job
         run: |
-          echo ${{ secrets.BF_HOST_${{ matrix.board }} }}
+          echo ${{ secrets.BF_HOST_$matrix.board}}
         shell: bash
 
 #   uninstall_lnx_xrt:
