@@ -126,8 +126,8 @@ shim::
   xclLog(XRT_INFO, "%s", __func__);
 
 //  xdphal::finish_flush_device(handle) ;
-  xdpaie::finish_flush_aie_device(this) ;
-  xdpaiectr::end_aie_ctr_poll(this);
+  xdp::aie::finish_flush_device(this) ;
+  xdp::aie::ctr::end_poll(this);
 
   // The BO cache unmaps and releases all execbo, but this must
   // be done before the device (mKernelFD) is closed.
@@ -1521,6 +1521,53 @@ closeGraphContext(unsigned int graphId)
   return ret ? -errno : ret;
 }
 
+int
+shim::
+openAIEContext(xrt::aie::access_mode am)
+{
+  unsigned int flags;
+  int ret;
+
+  switch (am) {
+
+  case xrt::aie::access_mode::exclusive:
+    flags = ZOCL_CTX_EXCLUSIVE;
+    break;
+
+  case xrt::aie::access_mode::primary:
+    flags = ZOCL_CTX_PRIMARY;
+    break;
+
+  case xrt::aie::access_mode::shared:
+    flags = ZOCL_CTX_SHARED;
+    break;
+
+  default:
+    return -EINVAL;
+  }
+
+  drm_zocl_ctx ctx = {0};
+  ctx.flags = flags;
+  ctx.op = ZOCL_CTX_OP_ALLOC_AIE_CTX;
+
+  ret = ioctl(mKernelFD, DRM_IOCTL_ZOCL_CTX, &ctx);
+  return ret ? -errno : ret;
+}
+
+xrt::aie::access_mode
+shim::
+getAIEAccessMode()
+{
+  return access_mode;
+}
+
+void
+shim::
+setAIEAccessMode(xrt::aie::access_mode am)
+{
+  access_mode = am;
+}
+
 #endif
 
 } // end namespace ZYNQ
@@ -1535,22 +1582,26 @@ xclProbe()
   if (fd < 0) {
     return 0;
   }
+  std::vector<char> name(128,0);
+  std::vector<char> desc(512,0);
+  std::vector<char> date(128,0);
   drm_version version;
   std::memset(&version, 0, sizeof(version));
-  version.name = new char[128];
+  version.name = name.data();
   version.name_len = 128;
-  version.desc = new char[512];
+  version.desc = desc.data();
   version.desc_len = 512;
-  version.date = new char[128];
+  version.date = date.data();
   version.date_len = 128;
 
   int result = ioctl(fd, DRM_IOCTL_VERSION, &version);
-  if (result)
+  if (result) {
+    close(fd);
     return 0;
+  }
 
   result = std::strncmp(version.name, "zocl", 4);
   close(fd);
-
   return (result == 0) ? 1 : 0;
 }
 #endif
@@ -1767,8 +1818,8 @@ xclLoadXclBin(xclDeviceHandle handle, const xclBin *buffer)
     ZYNQ::shim *drv = ZYNQ::shim::handleCheck(handle);
 
 #ifndef __HWEM__
-    xdphal::flush_device(handle) ;
-    xdpaie::flush_aie_device(handle) ;
+    xdp::hal::flush_device(handle) ;
+    xdp::aie::flush_device(handle) ;
 #endif
 
 
@@ -1809,9 +1860,9 @@ xclLoadXclBin(xclDeviceHandle handle, const xclBin *buffer)
     }
 
 #ifndef __HWEM__
-    xdphal::update_device(handle) ;
-    xdpaie::update_aie_device(handle);
-    xdpaiectr::update_aie_device(handle);
+    xdp::hal::update_device(handle) ;
+    xdp::aie::update_device(handle);
+    xdp::aie::ctr::update_device(handle);
 
     START_DEVICE_PROFILING_CB(handle);
 #endif
