@@ -54,23 +54,34 @@ jobs:
 #         rm -rf "$GITHUB_WORKSPACE/build/Release"
 #       shell: bash
 
-  build_xrt_edge:
+#   build_xrt_edge:
+#     strategy:
+#       matrix:
+#         platform: [zynq]
+#     runs-on: self-hosted-docker-${{ matrix.platform }}
+#     steps:
+#     - uses: actions/checkout@v2
+#     - name: XRT for Edge platform Build
+#       run: |
+#         unset http_proxy https_proxy
+#         mkdir -p /tmp/
+#         cd build 
+#         chmod +x build_edge.sh 
+#         sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
+#         rm -rf /tmp/*
+#       shell: bash
+
+  board_reset:
     strategy:
       matrix:
-        os: [zynq]
-    runs-on: self-hosted-docker-${{ matrix.os }}
+        board: [u250, u280]
+    runs-on: self-hosted-docker-zynq
     steps:
-    - uses: actions/checkout@v2
-    - name: XRT for Edge platform Build
-      run: |
-        unset http_proxy https_proxy
-        mkdir -p /tmp/
-        cd build 
-        chmod +x build_edge.sh 
-        sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
-        rm -rf /tmp/*
-      shell: bash
-  
+      - name: Test platform matrix job
+        run: |
+          echo ${{ secrets.BF_HOST_${{ matrix.board }} }}
+        shell: bash
+
 #   uninstall_lnx_xrt:
 #     strategy:
 #       matrix:
