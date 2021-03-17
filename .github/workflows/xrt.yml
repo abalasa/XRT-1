@@ -6,6 +6,9 @@ on:
   pull_request: 
     branches: [ master ]
 
+env:
+  RELEASE: 2021.1
+
 jobs:
   build_lnx_matrix:
     strategy:
