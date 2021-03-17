@@ -75,11 +75,16 @@ jobs:
     strategy:
       matrix:
         board: [u250, u280]
+        include:
+          - board: u250
+            bf_host: BF_HOST_U250
+          - board: u280
+            bf_host: BF_HOST_U280            
     runs-on: self-hosted-docker-zynq
     steps:
       - name: Test platform matrix job
         run: |
-          echo ${{ secrets.BF_HOST_$matrix.board}}
+          echo ${{ secrets[matrix.bf_host] }}
         shell: bash
 
 #   uninstall_lnx_xrt:
