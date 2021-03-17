@@ -54,23 +54,22 @@ jobs:
 #         rm -rf "$GITHUB_WORKSPACE/build/Release"
 #       shell: bash
 
-#   build_xrt_edge:
-#     strategy:
-#       matrix:
-#         os: [zynq]      
-#     runs-on: self-hosted-docker-${{ matrix.os }}
-#     steps:
-#     - uses: actions/checkout@v2
-#     - name: XRT for Edge platform Build
-#       run: |
-#         unset http_proxy https_proxy
-#         source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
-#         mkdir -p /tmp/
-#         cd build 
-#         chmod +x build_edge.sh 
-#         sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
-#         rm -rf /tmp/*
-#       shell: bash
+  build_xrt_edge:
+    strategy:
+      matrix:
+        os: [zynq]
+    runs-on: self-hosted-docker-${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: XRT for Edge platform Build
+      run: |
+        unset http_proxy https_proxy
+        mkdir -p /tmp/
+        cd build 
+        chmod +x build_edge.sh 
+        sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
+        rm -rf /tmp/*
+      shell: bash
   
 #   uninstall_lnx_xrt:
 #     strategy:
@@ -81,24 +80,24 @@ jobs:
 #       - name: Uninstall xrt rpms
 #         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   
-  build_win_matrix:
-    strategy:
-      matrix:
-        os: [windows10]      
-    runs-on: self-hosted-${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: XRT Windows Build
-        run: >-
-          call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
-          cd build &
-          build.bat -release
-        shell: cmd
-      - name: Stash files Win10
-        uses: actions/upload-artifact@v2
-        with:
-         name: xrt-exe-${{ matrix.os }}
-         path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
+#   build_win_matrix:
+#     strategy:
+#       matrix:
+#         os: [windows10]      
+#     runs-on: self-hosted-${{ matrix.os }}
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: XRT Windows Build
+#         run: >-
+#           call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
+#           cd build &
+#           build.bat -release
+#         shell: cmd
+#       - name: Stash files Win10
+#         uses: actions/upload-artifact@v2
+#         with:
+#          name: xrt-exe-${{ matrix.os }}
+#          path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
   
 #   board_reset:
 #     runs-on: self-hosted-bf-runner
