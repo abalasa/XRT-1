@@ -176,11 +176,11 @@ jobs:
     steps:
       - name: Run HW Emulation tests
         run: |
-          #source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
-          #source /opt/xilinx/xrt/setup.sh
-          #export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/lib/lnx64.o/Default
-          #cd /scratch/tests/PCIE_VITIS_DSV_XRT_hw_emu_lin_lin_x86_20210128_035800_XRT_XILINX_U50_GEN3X16_XDMA_201920_3_MISC_lnx64/
-          #export XCL_EMULATION_MODE=hw_emu; ./host.exe -d acc -k kernel.xclbin
-          cd /scratch/xrt_tests
-          ${{ secrets.PYTHON }} xrt.py --chooseEmu HW_EMU --runTest True
+          source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+          source /opt/xilinx/xrt/setup.sh
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/lib/lnx64.o/Default
+          cd /scratch/tests/PCIE_VITIS_DSV_XRT_hw_emu_lin_lin_x86_20210128_035800_XRT_XILINX_U50_GEN3X16_XDMA_201920_3_MISC_lnx64/
+          export XCL_EMULATION_MODE=hw_emu; ./host.exe -d acc -k kernel.xclbin
+          #cd /scratch/xrt_tests
+          #${{ secrets.PYTHON }} xrt.py --chooseEmu HW_EMU --runTest True
         shell: bash
