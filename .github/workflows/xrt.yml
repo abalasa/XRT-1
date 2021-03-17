@@ -54,22 +54,28 @@ jobs:
 #         rm -rf "$GITHUB_WORKSPACE/build/Release"
 #       shell: bash
 
-#   build_xrt_edge:
-#     strategy:
-#       matrix:
-#         platform: [zynq]
-#     runs-on: self-hosted-docker-${{ matrix.platform }}
-#     steps:
-#     - uses: actions/checkout@v2
-#     - name: XRT for Edge platform Build
-#       run: |
-#         unset http_proxy https_proxy
-#         mkdir -p /tmp/
-#         cd build 
-#         chmod +x build_edge.sh 
-#         sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
-#         rm -rf /tmp/*
-#       shell: bash
+  build_xrt_edge:
+    strategy:
+      matrix:
+        platform: [zynq]
+    runs-on: self-hosted-docker-${{ matrix.platform }}
+    steps:
+    - uses: actions/checkout@v2
+    - name: XRT for Edge platform Build
+      run: |
+        unset http_proxy https_proxy
+        mkdir -p /tmp/
+        cd build 
+        chmod +x build_edge.sh 
+        sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
+        rm -rf /tmp/*
+      shell: bash
+    - name: Cleanup build dirs
+      if: ${{ always() }}
+      run: |
+        echo "Cleaning up build dirs for this run"
+        rm -rf "$GITHUB_WORKSPACE/build/aarch32" 
+      shell: bash
 
 #   board_reset:
 #     strategy:
@@ -96,30 +102,30 @@ jobs:
 #       - name: Uninstall xrt rpms
 #         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   
-  build_win_matrix:
-    strategy:
-      matrix:
-        os: [windows10]      
-    runs-on: self-hosted-${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: XRT Windows Build
-        run: >-
-          call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
-          cd build &
-          build.bat -release
-        shell: cmd
-      - name: Stash files Win10
-        uses: actions/upload-artifact@v2
-        with:
-         name: xrt-exe-${{ matrix.os }}
-         path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
-      - name: Runner workspace path
-        if: ${{ always() }}
-        run: >-
-          echo "Cleaning up previous run" &
-          @RD /S /Q "${{ github.workspace }}/build/WRelease"
-        shell: cmd
+#   build_win_matrix:
+#     strategy:
+#       matrix:
+#         os: [windows10]      
+#     runs-on: self-hosted-${{ matrix.os }}
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: XRT Windows Build
+#         run: >-
+#           call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
+#           cd build &
+#           build.bat -release
+#         shell: cmd
+#       - name: Stash files Win10
+#         uses: actions/upload-artifact@v2
+#         with:
+#          name: xrt-exe-${{ matrix.os }}
+#          path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
+#       - name: Runner workspace path
+#         if: ${{ always() }}
+#         run: >-
+#           echo "Cleaning up previous run" &
+#           @RD /S /Q "${{ github.workspace }}/build/WRelease"
+#         shell: cmd
 
 
 #   board_reset:
