@@ -71,21 +71,21 @@ jobs:
 #         rm -rf /tmp/*
 #       shell: bash
 
-  board_reset:
-    strategy:
-      matrix:
-        board: [u250, u280]
-        include:
-          - board: u250
-            bf_host: BF_HOST_U250
-          - board: u280
-            bf_host: BF_HOST_U280            
-    runs-on: self-hosted-docker-zynq
-    steps:
-      - name: Test platform matrix job
-        run: |
-          echo ${{ secrets[matrix.bf_host] }}
-        shell: bash
+#   board_reset:
+#     strategy:
+#       matrix:
+#         board: [u250, u280]
+#         include:
+#           - board: u250
+#             bf_host: BF_HOST_U250
+#           - board: u280
+#             bf_host: BF_HOST_U280            
+#     runs-on: self-hosted-docker-zynq
+#     steps:
+#       - name: Test platform matrix job
+#         run: |
+#           echo ${{ secrets[matrix.bf_host] }}
+#         shell: bash
 
 #   uninstall_lnx_xrt:
 #     strategy:
@@ -96,25 +96,32 @@ jobs:
 #       - name: Uninstall xrt rpms
 #         run: ${{ secrets.SUDO }} yum remove -y xrt xrt-aws
   
-#   build_win_matrix:
-#     strategy:
-#       matrix:
-#         os: [windows10]      
-#     runs-on: self-hosted-${{ matrix.os }}
-#     steps:
-#       - uses: actions/checkout@v2
-#       - name: XRT Windows Build
-#         run: >-
-#           call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
-#           cd build &
-#           build.bat -release
-#         shell: cmd
-#       - name: Stash files Win10
-#         uses: actions/upload-artifact@v2
-#         with:
-#          name: xrt-exe-${{ matrix.os }}
-#          path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
-  
+  build_win_matrix:
+    strategy:
+      matrix:
+        os: [windows10]      
+    runs-on: self-hosted-${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: XRT Windows Build
+        run: >-
+          call C:\"Program Files (x86)"\"Microsoft Visual Studio"\2017\Community\VC\Auxiliary\Build\vcvars64.bat &
+          cd build &
+          build.bat -release
+        shell: cmd
+      - name: Stash files Win10
+        uses: actions/upload-artifact@v2
+        with:
+         name: xrt-exe-${{ matrix.os }}
+         path: build\WRelease\xilinx\xrt\bin\unwrapped\*.exe
+      - name: Runner workspace path
+        if: ${{ always() }}
+        run: >-
+          echo "Cleaning up previous run" &
+          @RD /S /Q "${{ github.workspace }}/build/WRelease"
+        shell: cmd
+
+
 #   board_reset:
 #     runs-on: self-hosted-bf-runner
 #     steps:
