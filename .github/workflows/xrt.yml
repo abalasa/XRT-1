@@ -10,7 +10,7 @@ on:
     branches: [ master ]
 
 # Define environment variables
-# Can be accessed as $<envvar> in this workflow
+# Can be accessed as $<envvar> or ${{ env.envvar }} in this workflow
 env:
   RELEASE: 2021.1
 
@@ -37,13 +37,13 @@ jobs:
     - name: XRT Centos74 Build
       if: ${{ matrix.os == 'centos74' }}
       run: |
-        source /proj/xbuilds/$RELEASE_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
+        source /proj/xbuilds/${{ env.RELEASE }}_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
         cd build && chmod +x build.sh && scl enable devtoolset-9 -- bash -c ./build.sh
       shell: bash
     - name: XRT Build
       if: ${{ matrix.os == 'centos8' }}
       run: |
-        source /proj/xbuilds/$RELEASE_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
+        source /proj/xbuilds/${{ env.RELEASE }}_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
         cd build && chmod +x build.sh && ./build.sh
       shell: bash
     - name: XRT Build
@@ -204,9 +204,9 @@ jobs:
     steps:
       - name: Run HW Emulation tests
         run: |
-          source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
+          source /proj/xbuilds/${{ env.RELEASE }}_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
           source /opt/xilinx/xrt/setup.sh
-          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/$RELEASE_daily_latest/installs/lin64/Vitis/$RELEASE/lib/lnx64.o/Default
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/${{ env.RELEASE }}_daily_latest/installs/lin64/Vitis/$RELEASE/lib/lnx64.o/Default
           cd /scratch/xrt_tests/HW_EMULATION_TESTS/sub_buffer_object_4cus-hw_emu-xilinx_u250_gen3x16_xdma_3_1_202020_1
           export XCL_EMULATION_MODE=hw_emu;  ./host.exe krnl_vadd_4cus.xclbin
           #cd /scratch/xrt_tests
