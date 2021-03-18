@@ -23,13 +23,13 @@ jobs:
     - name: XRT Centos74 Build
       if: ${{ matrix.os == 'centos74' }}
       run: |
-        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+        source /proj/xbuilds/$RELEASE_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
         cd build && chmod +x build.sh && scl enable devtoolset-9 -- bash -c ./build.sh
       shell: bash
     - name: XRT Build
       if: ${{ matrix.os == 'centos8' }}
       run: |
-        source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+        source /proj/xbuilds/$RELEASE_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
         cd build && chmod +x build.sh && ./build.sh
       shell: bash
     - name: XRT Build
@@ -108,7 +108,7 @@ jobs:
         mkdir -p /tmp/
         cd build 
         chmod +x build_edge.sh 
-        sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/${{ matrix.platform }}/petalinux.setup
+        sh build_edge.sh -setup /proj/xbb/xrt-embedded/$RELEASE/sw/xrt_pr/${{ matrix.platform }}/petalinux.setup
         rm -rf /tmp/*
       shell: bash
     - name: Cleanup Runner workspace path
@@ -159,7 +159,7 @@ jobs:
       - name: Run on board
         run: |
           cd /scratch/bf-logs 
-          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ secrets.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r $RELEASE -x /home/${{ secrets.BF_USER }}/xrt-test-artifacts/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
         shell: bash
 
   test_win:
@@ -185,9 +185,9 @@ jobs:
     steps:
       - name: Run HW Emulation tests
         run: |
-          source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
+          source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
           source /opt/xilinx/xrt/setup.sh
-          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/lib/lnx64.o/Default
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/$RELEASE_daily_latest/installs/lin64/Vitis/$RELEASE/lib/lnx64.o/Default
           cd /scratch/xrt_tests/HW_EMULATION_TESTS/sub_buffer_object_4cus-hw_emu-xilinx_u250_gen3x16_xdma_3_1_202020_1
           export XCL_EMULATION_MODE=hw_emu;  ./host.exe krnl_vadd_4cus.xclbin
           #cd /scratch/xrt_tests
