@@ -106,7 +106,7 @@ jobs:
         mkdir -p /tmp/
         cd build 
         chmod +x build_edge.sh 
-        sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
+        sh build_edge.sh -setup /proj/xbb/xrt-embedded/$RELEASE/sw/xrt_pr/${{ matrix.platform }}/petalinux.setup
         rm -rf /tmp/*
       shell: bash
     - name: Cleanup Runner workspace path
