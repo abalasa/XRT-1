@@ -1,11 +1,16 @@
 name: XRT Build/Install Test CI
 
+# Configures trigger:
+# This workflow will be triggered on either a pull request created for Master branch or 
+# When a change is merged to master branch
 on:
   push:
     branches: [ master ]
   pull_request: 
     branches: [ master ]
 
+# Define environment variables
+# Can be accessed as $<envvar> in this workflow
 env:
   RELEASE: 2021.1
 
