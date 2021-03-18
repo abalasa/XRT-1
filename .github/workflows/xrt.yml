@@ -94,17 +94,27 @@ jobs:
   build_xrt_edge:
     strategy:
       matrix:
-        platform: [zynq]
+       include:
+         - platform: zynq
+           releasedir: aarch32
     runs-on: self-hosted-docker-${{ matrix.platform }}
     steps:
     - uses: actions/checkout@v2
     - name: XRT for Edge platform Build
       run: |
         unset http_proxy https_proxy
+        mkdir -p /tmp/
         cd build 
         chmod +x build_edge.sh 
         sh build_edge.sh -setup /proj/xbb/xrt-embedded/2021.1/sw/xrt_pr/zynq/petalinux.setup
         rm -rf /tmp/*
+      shell: bash
+    - name: Cleanup Runner workspace path
+      if: ${{ always() }}
+      run: |
+        echo "Cleaning up previous run"
+        rm -rf "$GITHUB_WORKSPACE/build/${{ matrix.platform.releasedir }}" 
+        rm -rf "/tmp/*"
       shell: bash
   
 #   board_reset:
