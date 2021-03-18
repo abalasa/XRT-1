@@ -10,6 +10,20 @@ env:
   RELEASE: 2021.1
 
 jobs:
+  code_analysis:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: microsoft/DevSkim-Action@v1
+    - uses: github/codeql-action/upload-sarif@v1
+      with:
+        sarif_file: devskim-results.sarif
+    - name: Stash files 
+      uses: actions/upload-artifact@v2
+      with:
+        name: xrt-code-analysis
+        path: devskim-results.sarif
+    
 #   build_lnx_matrix:
 #     strategy:
 #       matrix:
@@ -91,31 +105,31 @@ jobs:
 #           @RD /S /Q "${{ github.workspace }}/build/WRelease"
 #         shell: cmd
   
-  build_xrt_edge:
-    strategy:
-      matrix:
-       include:
-         - platform: zynq
-           releasedir: aarch32
-    runs-on: self-hosted-docker-${{ matrix.platform }}
-    steps:
-    - uses: actions/checkout@v2
-    - name: XRT for Edge platform Build
-      run: |
-        unset http_proxy https_proxy
-        mkdir -p /tmp/
-        cd build 
-        chmod +x build_edge.sh 
-        sh build_edge.sh -setup /proj/xbb/xrt-embedded/$RELEASE/sw/xrt_pr/${{ matrix.platform }}/petalinux.setup
-        rm -rf /tmp/*
-      shell: bash
-    - name: Cleanup Runner workspace path
-      if: ${{ always() }}
-      run: |
-        echo "Cleaning up previous run"
-        rm -rf "$GITHUB_WORKSPACE/build/${{ matrix.platform.releasedir }}" 
-        rm -rf "/tmp/*"
-      shell: bash
+#   build_xrt_edge:
+#     strategy:
+#       matrix:
+#        include:
+#          - platform: zynq
+#            releasedir: aarch32
+#     runs-on: self-hosted-docker-${{ matrix.platform }}
+#     steps:
+#     - uses: actions/checkout@v2
+#     - name: XRT for Edge platform Build
+#       run: |
+#         unset http_proxy https_proxy
+#         mkdir -p /tmp/
+#         cd build 
+#         chmod +x build_edge.sh 
+#         sh build_edge.sh -setup /proj/xbb/xrt-embedded/$RELEASE/sw/xrt_pr/${{ matrix.platform }}/petalinux.setup
+#         rm -rf /tmp/*
+#       shell: bash
+#     - name: Cleanup Runner workspace path
+#       if: ${{ always() }}
+#       run: |
+#         echo "Cleaning up previous run"
+#         rm -rf "$GITHUB_WORKSPACE/build/${{ matrix.platform.releasedir }}" 
+#         rm -rf "/tmp/*"
+#       shell: bash
   
 #   board_reset:
 #     runs-on: self-hosted-bf-runner
