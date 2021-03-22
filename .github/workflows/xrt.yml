@@ -201,9 +201,9 @@ jobs:
     runs-on: self-hosted-centos74
     needs: [build_lnx_matrix]
     steps:
-      - name: Cleanup /tmp/test-artifacts
+      - name: Cleanup /tmp/emulation_tests
         run: |
-          mkdir -p /tmp/test-artifacts/$GITHUB_RUN_NUMBER
+          mkdir -p /tmp/emulation_tests/$GITHUB_RUN_NUMBER
           mkdir -p ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build
           rm -rf /tmp/test-artifacts/$GITHUB_RUN_NUMBER/*
         shell: bash
@@ -224,8 +224,9 @@ jobs:
 #         shell: bash
       - name: Run Emulation tests using rdi
         run: |
-          tar -xzf /tmp/test-artifacts/$GITHUB_RUN_NUMBER/xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build/
+          tar -xzf /tmp/emulation_tests/$GITHUB_RUN_NUMBER/xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build/
           export RDI_DATA=${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results
           rdi regression --profile /proj/xbb/xrt/prod_pipeline/configs/2021.1/pcie/sw_emu/gating.prf --report-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --results-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --suite-category GATING,XRT
+          rm -rf /tmp/emulation_tests/$GITHUB_RUN_NUMBER
         shell: bash
 
