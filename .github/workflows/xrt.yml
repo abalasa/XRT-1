@@ -221,7 +221,6 @@ jobs:
 #         shell: bash
       - name: Run Emulation tests using rdi
         run: |
-          ls /tmp/emulation_tests/$GITHUB_RUN_NUMBER
           tar -xzf xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build/
           export RDI_DATA=${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results
           rdi regression --profile /proj/xbb/xrt/prod_pipeline/configs/2021.1/pcie/sw_emu/gating.prf --report-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --results-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --suite-category GATING,XRT
