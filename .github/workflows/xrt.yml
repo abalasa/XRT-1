@@ -205,13 +205,12 @@ jobs:
         run: |
           mkdir -p /tmp/emulation_tests/$GITHUB_RUN_NUMBER
           mkdir -p ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build
-          rm -rf /tmp/test-artifacts/$GITHUB_RUN_NUMBER/*
         shell: bash
       - name: Download XRT tar
         uses: actions/download-artifact@v2
         with:
           name: xrt-rpm-tar-centos74
-          path: /tmp/emulation_tests/$GITHUB_RUN_NUMBER
+          path: /tmp/emulation_tests/${{ env.GITHUB_RUN_NUMBER }}
 #       - name: Run HW Emulation tests
 #         run: |
 #           source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
@@ -224,6 +223,7 @@ jobs:
 #         shell: bash
       - name: Run Emulation tests using rdi
         run: |
+          ls /tmp/emulation_tests/$GITHUB_RUN_NUMBER
           tar -xzf /tmp/emulation_tests/$GITHUB_RUN_NUMBER/xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build/
           export RDI_DATA=${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results
           rdi regression --profile /proj/xbb/xrt/prod_pipeline/configs/2021.1/pcie/sw_emu/gating.prf --report-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --results-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --suite-category GATING,XRT
