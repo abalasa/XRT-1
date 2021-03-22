@@ -211,7 +211,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: xrt-rpm-tar-centos74
-          path: /tmp/test-artifacts/$GITHUB_RUN_NUMBER
+          path: /tmp/emulation_tests/$GITHUB_RUN_NUMBER
 #       - name: Run HW Emulation tests
 #         run: |
 #           source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
