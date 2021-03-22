@@ -222,7 +222,7 @@ jobs:
       - name: Run Emulation tests using rdi
         run: |
           tar -xzf xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build/
-          export WS_PATH=$GITHUB_WORKSPACE RDI_DATA=${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results BUILD_NUMBER=$GITHUB_RUN_NUMBER XRT_BUILD_PATH=${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build/
+          export PROFILE_PATH=/proj/xbb/xrt/prod_pipeline/configs/2021.1/pcie/sw_emu/gating.prf WS_PATH=$GITHUB_WORKSPACE RDI_DATA=${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results BUILD_NUMBER=$GITHUB_RUN_NUMBER XRT_BUILD_PATH=${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build/
           rdi regression --profile /proj/xbb/xrt/prod_pipeline/configs/2021.1/pcie/sw_emu/gating.prf --report-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --results-path ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results --suite-category GATING,XRT
           rm -rf $GITHUB_WORKSPACE/xrt_*-xrt.tar.gz
         shell: bash
