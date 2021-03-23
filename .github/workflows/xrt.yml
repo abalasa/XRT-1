@@ -57,6 +57,12 @@ jobs:
       with:
         name: xrt-${{ matrix.packageType }}-${{ matrix.os }}
         path: build/Release/xrt_*-xrt.${{ matrix.packageType }}
+    - name: Stash tar.gx files on Centos
+      if: ${{ matrix.os == 'centos74'}}
+      uses: actions/upload-artifact@v2
+      with:
+        name: xrt-rpm-tar-${{ matrix.os }}
+        path: build/Release/xrt_*-xrt.tar.gz
     - name: Clean up workspace
       # Cleanup workspace build dirs
       if: ${{ always() }}
@@ -197,18 +203,35 @@ jobs:
           xclbinutil.exe
         shell: cmd
 
-  hw_emulation_tests:
-    # Run Emulation tests on host XRT package is installed
+  emulation_tests:
+    strategy:
+      matrix:
+        type: [hw_emu, sw_emu]
     runs-on: self-hosted-centos74
-    needs: [install_lnx_matrix]
+    needs: [build_lnx_matrix]
     steps:
-      - name: Run HW Emulation tests
+      - name: Setup results and build paths
         run: |
-          source /proj/xbuilds/${{ env.RELEASE }}_daily_latest/installs/lin64/Vitis/$RELEASE/settings64.sh
-          source /opt/xilinx/xrt/setup.sh
-          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/${{ env.RELEASE }}_daily_latest/installs/lin64/Vitis/$RELEASE/lib/lnx64.o/Default
-          cd /scratch/xrt_tests/HW_EMULATION_TESTS/sub_buffer_object_4cus-hw_emu-xilinx_u250_gen3x16_xdma_3_1_202020_1
-          export XCL_EMULATION_MODE=hw_emu;  ./host.exe krnl_vadd_4cus.xclbin
-          #cd /scratch/xrt_tests
-          #${{ secrets.PYTHON }} xrt.py --chooseEmu HW_EMU --runTest True
+          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}
         shell: bash
+      - name: Download XRT tar
+        uses: actions/download-artifact@v2
+        with:
+          name: xrt-rpm-tar-centos74
+      - name: Run Emulation tests using rdi
+        run: |
+          tar -xzf xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}/
+          export PROFILE_PATH=/proj/xbb/xrt/prod_pipeline/configs/$RELEASE/pcie/${{ matrix.type }}/gating.prf WS_PATH=$GITHUB_WORKSPACE RDI_DATA=${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} BUILD_NUMBER=$GITHUB_RUN_NUMBER XRT_BUILD_PATH=${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/
+          rdi regression --profile /proj/xbb/xrt/prod_pipeline/configs/$RELEASE/pcie/${{ matrix.type }}/gating.prf --report-path ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} --results-path ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} --suite-category GATING,XRT
+        shell: bash
+      - name: Parse RDI yaml files
+        run: |
+          python ${{ secrets.EXTRACTION_AREA }}/scripts/yaml_parser.py ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }}/*.yml
+      - name: Cleanup Runner workspace path/build path
+        if: ${{ always() }}
+        run: |
+          echo "Cleaning up previous run"
+          rm -rf $GITHUB_WORKSPACE/xrt_*-xrt.tar.gz
+          rm -rf ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}
+        shell: bash
+
