@@ -27,10 +27,11 @@ jobs:
   yml_parser:
     runs-on: self-hosted-centos74
     steps:
-      - uses: CumulusDS/get-yaml-paths-action@v0.1.0
+      - uses: CumulusDS/get-yaml-paths-action@v0.0.3
         id: resultsYML
         with:
           file: ${{ secrets.EXTRACTION_AREA }}/159/test-results/pcie_lnx64.yml
+          FAIL: stats.FAIL
       - name: print stats
         run: |
           echo ${{ steps.resultsYML.outputs.data }}
