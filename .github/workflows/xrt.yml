@@ -33,7 +33,7 @@ jobs:
           file: ${{ secrets.EXTRACTION_AREA }}/159/test-results/pcie_lnx64.yml
       - name: print stats
         run: |
-          echo ${{ steps.resultsYML }}
+          echo ${{ steps.resultsYML.outputs }}
         shell: bash
 
   build_lnx_matrix:
