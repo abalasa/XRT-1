@@ -27,7 +27,7 @@ jobs:
   yml_parser:
     runs-on: self-hosted-centos74
     steps:
-      - uses: cumulusds@v0.0.0
+      - uses: @cumulusds@v0.0.0
         id: stats
         with:
           file: ${{ secrets.EXTRACTION_AREA }}/159/test-results/pcie_lnx64.yml
