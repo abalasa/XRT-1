@@ -27,7 +27,7 @@ jobs:
   yml_parser:
     runs-on: self-hosted-centos74
     steps:
-      - uses: CumulusDS/get-yaml-paths-action@v0.0.3
+      - uses: CumulusDS/get-yaml-paths-action@v0.1.0
         id: resultsYML
         with:
           file: ${{ secrets.EXTRACTION_AREA }}/159/test-results/pcie_lnx64.yml
