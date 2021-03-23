@@ -157,7 +157,7 @@ jobs:
           echo "BF_HOST=$(cat $GITHUB_WORKSPACE/../../host)" >> $GITHUB_ENV
       - name: Reset board
         run: |
-          echo $BF_HOST
+          echo $GITHUB_ENV
           cd /scratch/bf-logs
           echo "${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ env.BF_HOST }}"
         shell: bash
