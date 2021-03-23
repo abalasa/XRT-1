@@ -31,10 +31,10 @@ jobs:
         id: resultsYML
         with:
           file: ${{ secrets.EXTRACTION_AREA }}/159/test-results/pcie_lnx64.yml
-          FAIL: stats.FAIL
+          fail: stats.FAIL
       - name: print stats
         run: |
-          echo ${{ steps.resultsYML.outputs.data }}
+          echo ${{ steps.resultsYML.outputs.fail }}
         shell: bash
 
   build_lnx_matrix:
