@@ -213,7 +213,7 @@ jobs:
     runs-on: self-hosted-centos74
     needs: [build_lnx_matrix]
     steps:
-      - name: Cleanup /tmp/emulation_tests
+      - name: Setup results and build paths
         run: |
           mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build
         shell: bash
@@ -221,16 +221,6 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: xrt-rpm-tar-centos74
-#       - name: Run HW Emulation tests
-#         run: |
-#           source /proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/settings64.sh
-#           source /opt/xilinx/xrt/setup.sh
-#           export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/proj/xbuilds/2021.1_daily_latest/installs/lin64/Vitis/2021.1/lib/lnx64.o/Default
-#           cd /scratch/xrt_tests/HW_EMULATION_TESTS/sub_buffer_object_4cus-hw_emu-xilinx_u250_gen3x16_xdma_3_1_202020_1
-#           export XCL_EMULATION_MODE=hw_emu;  ./host.exe krnl_vadd_4cus.xclbin
-#           #cd /scratch/xrt_tests
-#           #${{ secrets.PYTHON }} xrt.py --chooseEmu HW_EMU --runTest True
-#         shell: bash
       - name: Run Emulation tests using rdi
         run: |
           tar -xzf xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/
@@ -240,7 +230,7 @@ jobs:
       - name: Parse RDI yaml files
         run: |
           python ${{ secrets.EXTRACTION_AREA }}/scripts/yaml_parser.py ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/*.yml
-      - name: Cleanup Runner workspace path
+      - name: Cleanup Runner workspace path/build path
         if: ${{ always() }}
         run: |
           echo "Cleaning up previous run"
