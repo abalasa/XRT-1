@@ -17,6 +17,7 @@ env:
 jobs:
   build_lnx_matrix:
   # Start matrix style jobs for linux builds
+    environment: Test
     strategy:
       matrix:
         include:
@@ -85,6 +86,7 @@ jobs:
 
   build_win_matrix:
     # Start matrix style job for Windows10 builds
+    environment: Test
     strategy:
       matrix:
         include:
@@ -113,6 +115,7 @@ jobs:
   
   build_xrt_edge:
     # Start matrix style jobs to build XRT for Edge platforms
+    environment: Test
     strategy:
       matrix:
        include:
@@ -138,20 +141,9 @@ jobs:
         rm -rf "$GITHUB_WORKSPACE/build/${{ matrix.platform.releaseDir }}" 
         rm -rf "/tmp/*"
       shell: bash
-  
-  board_reset:
-    # Reset boardfarm host by removing previously installed XRT, XSA and cold reboot.
-    runs-on: self-hosted-bf-runner
-    steps:
-      - name: Reset board
-        run: |
-          cd /scratch/bf-logs
-          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
-        shell: bash
 
   install_lnx_matrix:
     # Start matrix style jobs Install XRT built in this workflow
-    environment: Test
     strategy:
       matrix:
         os: [centos74]        
@@ -167,10 +159,14 @@ jobs:
   
   board_test:
     # Run boardfarm tests after approval from "Test"
-    environment: Test
     runs-on: self-hosted-bf-runner
-    needs: [build_lnx_matrix, board_reset]
+    needs: [build_lnx_matrix]
     steps:
+      - name: Reset board
+        run: |
+          cd /scratch/bf-logs
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ secrets.BF_HOST }}
+        shell: bash
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
         with:
