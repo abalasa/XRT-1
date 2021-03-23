@@ -215,7 +215,7 @@ jobs:
     steps:
       - name: Cleanup /tmp/emulation_tests
         run: |
-          mkdir -p ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/test-results ${{ secrets.EXTRACTION_AREA }}/$GITHUB_RUN_NUMBER/build
+          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build
         shell: bash
       - name: Download XRT tar
         uses: actions/download-artifact@v2
