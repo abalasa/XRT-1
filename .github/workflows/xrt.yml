@@ -154,10 +154,10 @@ jobs:
     steps:
       - name: get host
         run: |
-          export BF_HOST=`cat $GITHUB_WORKSPACE/../../host`
-          echo "::set-env name=BF_HOST::$BF_HOST"
+          echo "BF_HOST=$(cat $GITHUB_WORKSPACE/../../host)" >> $GITHUB_ENV
       - name: Reset board
         run: |
+          echo $BF_HOST
           cd /scratch/bf-logs
           echo "${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ env.BF_HOST }}"
         shell: bash
