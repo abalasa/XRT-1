@@ -28,15 +28,12 @@ jobs:
     runs-on: self-hosted-centos74
     steps:
       - uses: CumulusDS/get-yaml-paths-action@v0.1.0
-        id: stats
+        id: resultsYML
         with:
           file: ${{ secrets.EXTRACTION_AREA }}/159/test-results/pcie_lnx64.yml
-          failCount: stats.FAIL
-          passCount: stats.PASS
-          intrCount: stats.INTR
       - name: print stats
         run: |
-          echo ${{ steps.stats.failCount }}
+          echo ${{ steps.resultsYML.stats.FAIL }}
         shell: bash
 
   build_lnx_matrix:
