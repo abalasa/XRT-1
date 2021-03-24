@@ -153,15 +153,15 @@ jobs:
     runs-on: self-hosted-centos74
     needs: [build_lnx_matrix]
     steps:
-      - name: Create dirs
-        run: |
-          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
-        shell: bash
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
         with:
           name: xrt-rpm-centos74
-          path: ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
+      - name: Create dirs and Move RPMs
+        run: |
+          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
+          mv *-xrt.rpm ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms/
+        shell: bash
 
   board_test:
     strategy:
