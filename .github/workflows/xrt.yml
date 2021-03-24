@@ -174,12 +174,12 @@ jobs:
         run: |
           echo "BF_HOST=$(cat $GITHUB_WORKSPACE/../../host)" >> $GITHUB_ENV
         shell: bash
-#       - name: Reset board
-#         run: |
-#           cd /scratch/bf-logs
-#           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ env.BF_HOST }}
-#         shell: bash
-      - name: Run on board
+      - name: Reset board
+        run: |
+          cd /scratch/bf-logs
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ env.BF_HOST }}
+        shell: bash
+      - name: Install xrt and run tests on board host
         run: |
           cd /scratch/bf-logs 
           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ env.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
