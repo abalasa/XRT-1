@@ -148,15 +148,29 @@ jobs:
 #         rm -rf "$GITHUB_WORKSPACE/build/${{ matrix.platform.releasedir }}" 
 #         rm -rf "/tmp/*"
 #       shell: bash
-  
-  board_reset:
+
+  download_rpms:
+    runs-on: self-hosted-centos74
+    needs: [build_lnx_matrix]
+    steps:
+      - name: Create dirs
+        run: |
+          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
+        shell: bash
+      - name: Download XRT rpms
+        uses: actions/download-artifact@v2
+        with:
+          name: xrt-rpm-centos74
+          path: ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
+
+  board_test:
     strategy:
       matrix:
         board: [u50]
     runs-on: self-hosted-bf-runner-${{ matrix.board }}
-    needs: [build_lnx_matrix]
+    needs: [download_rpms]
     steps:
-      - name: get host
+      - name: get boardfarm hostname
         run: |
           echo "BF_HOST=$(cat $GITHUB_WORKSPACE/../../host)" >> $GITHUB_ENV
         shell: bash
@@ -164,24 +178,23 @@ jobs:
 #         run: |
 #           cd /scratch/bf-logs
 #           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ env.BF_HOST }}
-#           mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
 #         shell: bash
-      - name: Download XRT rpms
-        uses: actions/download-artifact@v2
-        with:
-          name: xrt-rpm-centos74
-          path: ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
       - name: Run on board
         run: |
           cd /scratch/bf-logs 
           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ env.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
-        shell: bash
+        shell: bash     
+  
+  cleanup_rpms:
+    runs-on: self-hosted-centos74
+    needs: [board_test]
+    steps:
       - name: Cleanup rpms on disk
         if: ${{ always() }}
         run: |
           echo "Cleaning up previous run"
           rm -rf "${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms"
-        shell: bash      
+        shell: bash
 
 #   install_lnx_matrix:
 #     environment: Test
