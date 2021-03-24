@@ -160,12 +160,12 @@ jobs:
         run: |
           echo "BF_HOST=$(cat $GITHUB_WORKSPACE/../../host)" >> $GITHUB_ENV
         shell: bash
-      - name: Reset board
-        run: |
-          cd /scratch/bf-logs
-          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ env.BF_HOST }}
-          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
-        shell: bash
+#       - name: Reset board
+#         run: |
+#           cd /scratch/bf-logs
+#           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/board_reset.log xrt-reset -n ${{ env.BF_HOST }}
+#           mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms
+#         shell: bash
       - name: Download XRT rpms
         uses: actions/download-artifact@v2
         with:
