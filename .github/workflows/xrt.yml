@@ -176,6 +176,12 @@ jobs:
           cd /scratch/bf-logs 
           ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ env.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
         shell: bash
+      - name: Cleanup rpms on disk
+        if: ${{ always() }}
+        run: |
+          echo "Cleaning up previous run"
+          rm -rf "${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms"
+        shell: bash      
 
 #   install_lnx_matrix:
 #     environment: Test
