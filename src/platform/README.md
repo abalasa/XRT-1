@@ -1,4 +1,4 @@
-About this directory
+About this directory - test
 ====================
 
 # Platforms 
