@@ -226,13 +226,14 @@ jobs:
   emulation_tests:
     strategy:
       matrix:
-        type: [hw_emu, sw_emu]
+        type: [pcie]
+        mode: [hw_emu, sw_emu]
     runs-on: self-hosted-centos74
     needs: [build_lnx_matrix]
     steps:
       - name: Setup results and build paths
         run: |
-          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}
+          mkdir -p ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }}/${{ matrix.mode }} ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}/${{ matrix.mode }}/
         shell: bash
       - name: Download XRT tar
         uses: actions/download-artifact@v2
@@ -240,18 +241,18 @@ jobs:
           name: xrt-rpm-tar-centos74
       - name: Run Emulation tests using rdi
         run: |
-          tar -xzf xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}/
-          export PROFILE_PATH=/proj/xbb/xrt/prod_pipeline/configs/$RELEASE/pcie/${{ matrix.type }}/gating.prf WS_PATH=$GITHUB_WORKSPACE RDI_DATA=${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} BUILD_NUMBER=$GITHUB_RUN_NUMBER XRT_BUILD_PATH=${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/
-          rdi regression --profile /proj/xbb/xrt/prod_pipeline/configs/$RELEASE/pcie/${{ matrix.type }}/gating.prf --report-path ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} --results-path ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }} --suite-category GATING,XRT
+          tar -xzf xrt_*-xrt.tar.gz -C ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}/${{ matrix.mode }}
+          export PROFILE_PATH=/proj/xbb/xrt/prod_pipeline/configs/$RELEASE/${{ matrix.type }}/${{ matrix.mode }}/gating.prf WS_PATH=$GITHUB_WORKSPACE RDI_DATA=${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }}/${{ matrix.mode }}/ BUILD_NUMBER=$GITHUB_RUN_NUMBER XRT_BUILD_PATH=${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}/${{ matrix.mode }}
+          rdi regression --profile /proj/xbb/xrt/prod_pipeline/configs/$RELEASE/${{ matrix.type }}/${{ matrix.mode }}/gating.prf --report-path ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }}/${{ matrix.mode }}/ --results-path ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }}/${{ matrix.mode }} --suite-category GATING,XRT
         shell: bash
       - name: Parse RDI yaml files
         run: |
-          python ${{ secrets.EXTRACTION_AREA }}/scripts/yaml_parser.py ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }}/*.yml
+          python ${{ secrets.EXTRACTION_AREA }}/scripts/yaml_parser.py ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/test-results/${{ matrix.type }}/${{ matrix.mode }}//*.yml
       - name: Cleanup Runner workspace path/build path
         if: ${{ always() }}
         run: |
           echo "Cleaning up previous run"
           rm -rf $GITHUB_WORKSPACE/xrt_*-xrt.tar.gz
-          rm -rf ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}
+          rm -rf ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/build/${{ matrix.type }}/${{ matrix.mode }}/
         shell: bash
 
