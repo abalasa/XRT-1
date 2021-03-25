@@ -183,7 +183,7 @@ jobs:
         run: |
           cd /scratch/bf-logs
           export PROFILE_PATH=/proj/xbb/xrt/test_pipeline/configs/$RELEASE/pcie/hw/gating.prf WS_PATH=$GITHUB_WORKSPACE BUILD_NUMBER=$GITHUB_RUN_NUMBER
-          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ env.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms/*-xrt.rpm --test_path ${{ secrets.PCIE_HW_TESTS_PATH }} --timeout 2400 --results-path /scratch/bf-logs/
+          ${{ secrets.BF_COMMAND }} --log-file /scratch/bf-logs/test.OUTPUT xrt-test -n ${{ env.BF_HOST }} -p xilinx_u50_gen3x16_xdma_201920_3 -r 2020.3 -x ${{ secrets.EXTRACTION_AREA }}/results/$GITHUB_RUN_NUMBER/rpms/*-xrt.rpm --test_path /proj/xbb/xrt/prod_pipeline/tests --timeout 2400 --results-path /scratch/bf-logs/
         shell: bash     
   
   cleanup_rpms:
