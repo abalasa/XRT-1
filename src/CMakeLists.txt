@@ -78,3 +78,5 @@ if (${XRT_NATIVE_BUILD} STREQUAL "yes")
 else()
   include(CMake/embedded_system.cmake)
 endif()
+
+# Test
