@@ -52,6 +52,7 @@ jobs:
       env:
         TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
         SHA: ${{ github.sha }}
+#         Test
     - name: Upload Coverity imed
       if: steps.cache-sha.outputs.cache-hit != 'true'
       uses: actions/upload-artifact@v1
